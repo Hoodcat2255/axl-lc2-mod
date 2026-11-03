@@ -1,0 +1,42 @@
+__pycache__/
+*.pyc
+.venv*/
+
+# where the user's game data is (axl_config.py), and the data itself
+/config.local.json
+/games/
+
+# written by the build from the user's game data
+/mods/axl/lc2/axl_anims.h
+/mods/axl/lc2/axl_dna_looks.h
+/mods/axl/lc2/axl_hud_looks.h
+/mods/axl/lc2/axl_gen.h
+/mods/axl/lc2/axl_pal.h
+/mods/axl/sound/
+/mods/axl/tools/bin/
+
+# build outputs; only the mod's edit data is kept
+/mods/axl/work/*
+!/mods/axl/work/sheet/
+!/mods/axl/work/face/
+/mods/axl/work/sheet/*
+!/mods/axl/work/sheet/axl_edits.json
+!/mods/axl/work/sheet/groups.json
+!/mods/axl/work/sheet/labels.json
+!/mods/axl/work/sheet/victory.json
+!/mods/axl/work/sheet/white_map.json
+!/mods/axl/work/sheet/boss_edits.json
+/mods/axl/work/face/*
+!/mods/axl/work/face/map4.json
+!/mods/axl/work/face/map5.json
+
+# game files and pictures never go in
+*.png
+*.gif
+*.ogg
+*.wav
+*.arc
+*.bin
+*.dll
+*.zip
+*.xdelta

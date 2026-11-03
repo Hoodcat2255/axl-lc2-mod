@@ -1,0 +1,120 @@
+# Shots of a change are gone with it (user request 2026-10-28): each boss fires, dashes, changes back at once.
+all_weapons
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+log unchange_b1
+pset 14C 1
+press 4 S
+idle 100
+press 20 X
+press 4 S
+idle 10
+press 20 A RIGHT
+show dna_shots
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b1_shots_gone
+idle 60
+log unchange_b2
+pset 14C 2
+press 4 S
+idle 100
+press 20 X
+press 4 S
+idle 10
+press 20 A RIGHT
+show dna_shots
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b2_shots_gone
+idle 60
+log unchange_b3
+pset 14C 3
+press 4 S
+idle 100
+press 20 X
+press 4 S
+idle 10
+press 20 A RIGHT
+show dna_shots
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b3_shots_gone
+idle 60
+log unchange_b4
+pset 14C 4
+press 4 S
+idle 100
+press 20 X
+press 4 S
+idle 10
+press 20 A RIGHT
+show dna_shots
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b4_shots_gone
+idle 60
+log unchange_b5
+pset 14C 5
+press 4 S
+idle 100
+press 20 X
+press 4 S
+idle 10
+press 20 A RIGHT
+show dna_shots
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b5_shots_gone
+idle 60
+log unchange_b6
+pset 14C 6
+press 4 S
+idle 100
+press 20 X
+press 4 S
+idle 10
+press 20 A RIGHT
+show dna_shots
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b6_shots_gone
+idle 60
+log unchange_b7
+pset 14C 7
+press 4 S
+idle 100
+press 20 X
+press 4 S
+idle 10
+press 20 A RIGHT
+show dna_shots
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b7_shots_gone
+idle 60
+log unchange_b8
+pset 14C 8
+press 4 S
+idle 100
+press 20 X
+press 4 S
+idle 10
+press 20 A RIGHT
+show dna_shots
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b8_shots_gone
+idle 60
+end

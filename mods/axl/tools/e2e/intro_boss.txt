@@ -1,0 +1,26 @@
+# The intro stage's end: respawn at checkpoint 2 (the boss room; dying with the checkpoint set, the game's own
+# respawn), the bot beats the D-1000 under god, the High Max event's dialogue runs on to the Hunter base (stage 15).
+# (The checkpoint jump leaves the boss room's background tiles unloaded: drawn garbled, the fight is not affected.)
+seq
+wait free == 1 9000
+expect stage == 0 intro_stage
+idle 30
+set 59 2
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+expect checkpoint == 2 respawned_at_boss_checkpoint
+god on
+bot boss
+wait boss_hp > 20 2400
+expect boss_hp > 20 boss_bar_filled
+wait boss_hp == 0 5400
+expect boss_alive == 1 boss_hp_0_body_left
+wait boss_alive == 0 3600
+expect hp > 0 player_alive_after_boss
+bot off
+talk 9000 stage == 15
+expect stage == 15 hunter_base_after_intro
+snap
+end

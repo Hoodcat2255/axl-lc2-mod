@@ -1,0 +1,131 @@
+# Plain Axl on the intro stage slopes (lc2_moves_gen.PLACES): up and down, walking / dashing / jumping (his own shots are the game's: no shots check).
+all_weapons
+seq
+wait free == 1 9000
+god on
+ghost on
+goto 1508 1080 8
+log slope1508_b0_up_walk
+mark
+press 80 LEFT
+idle 10
+show dx dy rise shots
+expect dx < -8 slope1508_b0_up_walk_moved
+expect dy < -4 slope1508_b0_up_walk_went_up
+expect embedded == 0 slope1508_b0_up_walk_free
+log slope1508_b0_up_dash
+mark
+press 4 LEFT
+press 20 A LEFT
+press 20 LEFT
+idle 10
+show dx dy rise shots
+expect dx < -24 slope1508_b0_up_dash_moved
+expect dy < -8 slope1508_b0_up_dash_went_up
+expect embedded == 0 slope1508_b0_up_dash_free
+log slope1508_b0_up_jump
+mark
+press 20 Z LEFT
+press 20 LEFT
+idle 50
+show dx dy rise shots
+expect rise > 8 slope1508_b0_up_jump_rose
+expect dx < -8 slope1508_b0_up_jump_moved
+expect embedded == 0 slope1508_b0_up_jump_free
+log slope1508_b0_shot
+mark
+press 30 X
+idle 20
+show dx dy rise shots
+expect embedded == 0 slope1508_b0_shot_free
+goto 1052 1000 8
+log slope1508_b0_down_walk
+mark
+press 80 RIGHT
+idle 10
+show dx dy rise shots
+expect dx > 8 slope1508_b0_down_walk_moved
+expect dy > 4 slope1508_b0_down_walk_went_down
+expect embedded == 0 slope1508_b0_down_walk_free
+log slope1508_b0_down_dash
+mark
+press 4 RIGHT
+press 20 A RIGHT
+press 20 RIGHT
+idle 10
+show dx dy rise shots
+expect dx > 24 slope1508_b0_down_dash_moved
+expect dy > 8 slope1508_b0_down_dash_went_down
+expect embedded == 0 slope1508_b0_down_dash_free
+log slope1508_b0_down_jump
+mark
+press 20 Z RIGHT
+press 20 RIGHT
+idle 50
+show dx dy rise shots
+expect rise > 8 slope1508_b0_down_jump_rose
+expect dx > 8 slope1508_b0_down_jump_moved
+expect embedded == 0 slope1508_b0_down_jump_free
+goto 5100 872 8
+log slope5100_b0_up_walk
+mark
+press 80 RIGHT
+idle 10
+show dx dy rise shots
+expect dx > 8 slope5100_b0_up_walk_moved
+expect dy < -4 slope5100_b0_up_walk_went_up
+expect embedded == 0 slope5100_b0_up_walk_free
+log slope5100_b0_up_dash
+mark
+press 4 RIGHT
+press 20 A RIGHT
+press 20 RIGHT
+idle 10
+show dx dy rise shots
+expect dx > 24 slope5100_b0_up_dash_moved
+expect dy < -8 slope5100_b0_up_dash_went_up
+expect embedded == 0 slope5100_b0_up_dash_free
+log slope5100_b0_up_jump
+mark
+press 20 Z RIGHT
+press 20 RIGHT
+idle 50
+show dx dy rise shots
+expect rise > 8 slope5100_b0_up_jump_rose
+expect dx > 8 slope5100_b0_up_jump_moved
+expect embedded == 0 slope5100_b0_up_jump_free
+log slope5100_b0_shot
+mark
+press 30 X
+idle 20
+show dx dy rise shots
+expect embedded == 0 slope5100_b0_shot_free
+goto 5300 824 8
+log slope5100_b0_down_walk
+mark
+press 80 LEFT
+idle 10
+show dx dy rise shots
+expect dx < -8 slope5100_b0_down_walk_moved
+expect dy > 4 slope5100_b0_down_walk_went_down
+expect embedded == 0 slope5100_b0_down_walk_free
+log slope5100_b0_down_dash
+mark
+press 4 LEFT
+press 20 A LEFT
+press 20 LEFT
+idle 10
+show dx dy rise shots
+expect dx < -24 slope5100_b0_down_dash_moved
+expect dy > 8 slope5100_b0_down_dash_went_down
+expect embedded == 0 slope5100_b0_down_dash_free
+log slope5100_b0_down_jump
+mark
+press 20 Z LEFT
+press 20 LEFT
+idle 50
+show dx dy rise shots
+expect rise > 8 slope5100_b0_down_jump_rose
+expect dx < -8 slope5100_b0_down_jump_moved
+expect embedded == 0 slope5100_b0_down_jump_free
+end

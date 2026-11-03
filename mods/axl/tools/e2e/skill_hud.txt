@@ -1,0 +1,131 @@
+# The skill HUD (docs/skills_design.md, user decisions 2026-11-03; axl_hud.c): 4 buttons at the bottom left while
+# changed (shot, special, dash, giga), the border filling as a cooldown runs, hidden when not changed and in the
+# change's pose. Snaps (e2e_skill_hud_fNNNN.png, the 'e2e log' line before each names it): not changed, the pose,
+# all ready, just used, cooling, ready again, after the camera scrolled, Yammark's toggles on / off, Turtloid,
+# changed back.
+all_weapons
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1080 4
+idle 40
+log snap_axl_not_changed
+show hud
+expect hud == 0 not_changed_hidden
+snap
+idle 20
+pset 14C 2
+press 4 S
+idle 10
+log snap_b2_pose
+show hud
+expect hud == 0 pose_hidden
+snap
+idle 60
+log snap_b2_ready
+show hud cd_special cd_dash cd_giga
+expect hud == 15 b2_shown
+snap
+idle 20
+press 2 S RIGHT
+idle 40
+press 2 A RIGHT
+idle 8
+log snap_b2_used
+show hud cd_special cd_dash
+expect hud == 15 b2_used_shown
+expect cd_special > 0 b2_special_cooling
+expect cd_dash > 0 b2_dash_cooling
+snap
+idle 60
+log snap_b2_cooling
+show cd_special cd_dash
+snap
+wait cd_special == 0 300
+idle 2
+log snap_b2_special_ready_flash
+snap
+idle 30
+goto 1052 1000 4
+idle 10
+press 2 S LEFT
+idle 30
+log snap_b2_scrolled
+show hud px py cd_special
+expect hud == 15 b2_scrolled_shown
+snap
+idle 30
+goto 1508 1080 4
+idle 4
+log snap_b2_scrolled_more
+show hud px py cd_special
+snap
+idle 200
+press 2 C
+idle 4
+log snap_b2_leaving
+show hud
+expect hud == 0 leaving_hidden
+snap
+idle 60
+log snap_b2_unchanged
+show hud
+expect hud == 0 unchanged_hidden
+snap
+idle 20
+pset 14C 1
+press 4 S
+idle 70
+log snap_b1_ready
+show hud
+expect hud == 15 b1_shown
+snap
+idle 30
+press 2 S
+idle 10
+log snap_b1_train_on
+snap
+idle 30
+hold A
+press 20 RIGHT
+log snap_b1_train_on_fast
+snap
+press 20 RIGHT
+release
+idle 30
+press 2 S
+idle 10
+log snap_b1_train_off
+snap
+idle 30
+press 2 C
+idle 60
+expect hud == 0 b1_unchanged_hidden
+goto 360 1080 4
+idle 20
+pset 14C 6
+press 4 S
+idle 70
+log snap_b6_ready
+show hud
+expect hud == 15 b6_shown
+snap
+idle 20
+press 2 S RIGHT
+idle 30
+press 2 A LEFT
+idle 20
+log snap_b6_used
+show hud cd_special cd_dash
+expect cd_special > 0 b6_special_cooling
+snap
+idle 60
+press 2 C
+idle 60
+log snap_b6_unchanged
+show hud
+expect hud == 0 b6_unchanged_hidden
+snap
+end

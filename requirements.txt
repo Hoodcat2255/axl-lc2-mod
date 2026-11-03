@@ -1,0 +1,4 @@
+# tested with these versions (the byte-for-byte same build needs the same zig)
+numpy==2.5.4
+pillow==13.0.0
+ziglang==0.17.0

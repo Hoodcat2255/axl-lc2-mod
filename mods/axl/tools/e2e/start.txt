@@ -1,0 +1,16 @@
+# fast start: collection menu -> X6, Space skips the opening, talk runs the stage dialogue, play starts at 7990
+key 900 905 RETURN
+key 1150 1155 DOWN
+key 1200 1204 Z
+key 1240 1244 Z
+key 1600 1604 SPACE
+key 1700 1704 SPACE
+key 1800 1804 SPACE
+key 1900 1904 SPACE
+key 2000 2004 SPACE
+key 2100 2104 SPACE
+key 2200 2204 SPACE
+key 2300 2304 SPACE
+key 2400 2404 SPACE
+talk 2300 6000
+skipto 7990

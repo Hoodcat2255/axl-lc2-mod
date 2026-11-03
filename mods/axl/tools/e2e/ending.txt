@@ -1,0 +1,45 @@
+# Sigma and the staff roll. The intro ends at once (its stage-end flag), the stage select is reached through the
+# Hunter base (to_stage_select.inc), and at PLAYER SELECT the picked stage becomes 12 area 1 (Sigma's stage, the
+# last of Gate's laboratory: checkpoints (160,224) and (3360,336)) - the game loads it as a picked stage, its tiles
+# right (a checkpoint jump loads none). goto walks the corridor to Sigma's door through the free cells; Sigma's
+# dialogues are paged with Z (he counts as free: page, not talk). Phase 1: the bot under god. Phase 2 (hit only when
+# the mouth opens): hit points set to 1 once the bar is full. The ending's dialogues paged with Z only (Space would
+# skip the roll), then the roll (stage 15 area 1) runs to its end, the Axl sprite credits on its last screens.
+seq
+include to_stage_select
+set 48 C
+set 49 1
+press 4 Z
+talk 6000 free == 1
+expect stage == 12 sigma_stage
+expect st_9A == 0 axl_not_falcon
+god on
+goto 3100 380 6
+hold RIGHT
+wait boss_alive == 1 1800
+release
+page 6000 boss_hp > 20
+expect boss_hp > 20 sigma1_bar
+bot boss
+wait boss_hp == 0 9000
+bot off
+page 6000 boss_hp > 20
+idle 300
+expect boss_hp > 50 sigma2_bar_full
+bset 84 1
+bot boss
+wait boss_hp == 0 9000
+bot off
+page 8000 stage == 11
+page 20000 area == 1
+expect stage == 15 roll_stage
+expect area == 1 roll_area
+# (the roll's frames: the Axl credits are on screen 13000-13400 frames after it starts, 2026-10-28 run sig5)
+idle 13000
+snap
+idle 200
+snap
+expect area == 1 roll_running_at_axl_credits
+idle 200
+snap
+end

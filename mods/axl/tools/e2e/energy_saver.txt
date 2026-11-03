@@ -1,0 +1,34 @@
+# The change's drain with X's parts (user report 2026-10-29 stream: Energy Saver did nothing): no parts, a full gauge
+# lasts DRAIN_FRAMES 600 frames (the change ends, HUD gone); Energy Saver (st+0xB0 bit 0x20) doubles it; the limited
+# Weapon Drive (P+0x2B8 = 3) stops it (not tested here: the game clears a poked mode at once, no limited part runs). hud = the skill HUD's buttons shown (15 while changed).
+all_weapons
+seq
+wait free == 1 9000
+god on
+ghost on
+goto 360 1080 4
+idle 30
+log drain_no_parts
+set B0 0
+energy full
+pset 14C 2
+press 2 S
+energy off
+idle 700
+show hud
+expect hud == 0 drain_no_parts_over
+idle 60
+log drain_energy_saver
+set B0 20
+energy full
+idle 2
+press 2 S
+energy off
+idle 900
+show hud
+expect hud == 15 drain_energy_saver_still
+idle 400
+show hud
+expect hud == 0 drain_energy_saver_over
+idle 60
+end

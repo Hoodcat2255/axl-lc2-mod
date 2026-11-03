@@ -1,0 +1,33 @@
+# Shooting on a wall holds the cling (no slide) in the wall shot pose (anim 125) (2026-11-02: the y hold after X's state
+# code now only works out of the cling, so a moving wall carries Axl - the Metal Shark stage's presses). The intro
+# stage walls of lc2_moves_gen.py (wall to the right).
+all_weapons
+seq
+wait free == 1 9000
+god on
+ghost on
+log wallshot_1560
+goto 1560 1105 4
+idle 30
+press 12 Z RIGHT
+press 6 RIGHT
+mark
+press 60 X RIGHT
+show dx dy state anim
+expect anim == 125 wallshot_1560_cling_shot
+expect dy < 4 wallshot_1560_no_slide
+expect dy > -4 wallshot_1560_no_rise
+release
+idle 60
+log wallshot_3800
+goto 3800 1105 4
+idle 30
+press 12 Z RIGHT
+press 6 RIGHT
+mark
+press 60 X RIGHT
+show dx dy state anim
+expect anim == 125 wallshot_3800_cling_shot
+expect dy < 4 wallshot_3800_no_slide
+expect dy > -4 wallshot_3800_no_rise
+end

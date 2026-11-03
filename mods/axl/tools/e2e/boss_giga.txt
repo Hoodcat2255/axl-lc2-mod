@@ -1,0 +1,499 @@
+# Boss giga attacks, batch 1 (docs/skills_design.md §2.2, plan A; axl_dna_bosses.c giga_*): Yammark (1), Wolfang (2),
+# Scaravich (5), Mijinion (8). Per boss: changed, the giga ready (cd_giga 0, the HUD's 4 buttons), the giga button (V)
+# starts it (cd_giga 1200 counting down, log "giga K start"), snaps during it, a second press after it is refused
+# (log "skill 3 refused", the cooldown not restarted), the HUD still up (Wolfang: its giga border half full, then
+# ready again after 1200 frames). First: Wolfang's giga at the intro's first
+# enemy (hpwatch: its hit points fall to id 0b). Last: a giga's projectiles go with the change (dna_shots 0).
+# Batch 2 (§2.2): Heatnix (3), Shark (4), Turtloid (6), Sheldon (7) the same way, and their projectiles gone with the
+# change too. Shark's fin swims into the intro's first enemy (hpwatch: its hit points fall to id 0d).
+all_weapons
+hpwatch 7990
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1080 4
+idle 40
+log giga_damage_b2
+pset 14C 2
+press 4 S
+idle 50
+press 2 RIGHT
+idle 2
+press 2 V
+idle 60
+log snap_damage_b2
+snap
+idle 100
+press 2 C
+idle 60
+goto 360 1080 4
+idle 40
+log giga_b1_yammark
+pset 14C 1
+press 4 S
+idle 60
+show cd_giga hud
+expect cd_giga == 0 b1_giga_ready
+expect hud == 15 b1_hud_shown
+press 2 RIGHT
+idle 2
+press 2 V
+idle 1
+show cd_giga
+expect cd_giga > 1150 b1_giga_used
+idle 10
+log snap_b1_t11
+snap
+idle 24
+log snap_b1_t35
+snap
+idle 20
+log snap_b1_t55
+snap
+idle 20
+log snap_b1_t75
+snap
+idle 20
+log snap_b1_t95
+snap
+idle 60
+press 2 V
+idle 2
+show cd_giga hud
+expect cd_giga > 0 b1_giga_cooling
+expect cd_giga < 1150 b1_giga_refused
+expect hud == 15 b1_hud_cooling
+log snap_b1_hud_cooling
+snap
+idle 40
+press 2 C
+idle 60
+goto 360 1080 4
+idle 40
+log giga_b2_wolfang
+pset 14C 2
+press 4 S
+idle 60
+show cd_giga hud
+expect cd_giga == 0 b2_giga_ready
+expect hud == 15 b2_hud_shown
+press 2 RIGHT
+idle 2
+press 2 V
+idle 1
+show cd_giga
+expect cd_giga > 1150 b2_giga_used
+idle 16
+log snap_b2_t17
+snap
+idle 30
+log snap_b2_t47
+snap
+idle 30
+log snap_b2_t77
+snap
+idle 30
+log snap_b2_t107
+snap
+idle 30
+log snap_b2_t137
+snap
+idle 60
+press 2 V
+idle 2
+show cd_giga hud
+expect cd_giga > 0 b2_giga_cooling
+expect cd_giga < 1150 b2_giga_refused
+expect hud == 15 b2_hud_cooling
+log snap_b2_hud_cooling
+snap
+idle 500
+log snap_b2_hud_half
+show cd_giga hud
+expect hud == 15 b2_hud_half_shown
+snap
+wait cd_giga == 0 900
+show cd_giga hud
+expect hud == 15 b2_hud_ready_again
+log snap_b2_hud_ready_again
+snap
+idle 40
+press 2 C
+idle 60
+goto 360 1080 4
+idle 40
+log giga_b5_scaravich
+pset 14C 5
+press 4 S
+idle 60
+show cd_giga hud
+expect cd_giga == 0 b5_giga_ready
+expect hud == 15 b5_hud_shown
+press 2 RIGHT
+idle 2
+press 2 V
+idle 1
+show cd_giga
+expect cd_giga > 1150 b5_giga_used
+idle 10
+log snap_b5_t11
+snap
+idle 14
+log snap_b5_t25
+snap
+idle 20
+log snap_b5_t45
+snap
+idle 30
+log snap_b5_t75
+snap
+idle 40
+log snap_b5_t115
+snap
+idle 60
+press 2 V
+idle 2
+show cd_giga hud
+expect cd_giga > 0 b5_giga_cooling
+expect cd_giga < 1150 b5_giga_refused
+expect hud == 15 b5_hud_cooling
+log snap_b5_hud_cooling
+snap
+idle 40
+press 2 C
+idle 60
+goto 360 1080 4
+idle 40
+log giga_b8_mijinion
+pset 14C 8
+press 4 S
+idle 60
+show cd_giga hud
+expect cd_giga == 0 b8_giga_ready
+expect hud == 15 b8_hud_shown
+press 2 RIGHT
+idle 2
+press 2 V
+idle 1
+show cd_giga
+expect cd_giga > 1150 b8_giga_used
+idle 3
+log snap_b8_t4
+snap
+idle 29
+log snap_b8_t33
+snap
+idle 24
+log snap_b8_t57
+snap
+idle 24
+log snap_b8_t81
+snap
+idle 24
+log snap_b8_t105
+snap
+idle 60
+press 2 V
+idle 2
+show cd_giga hud
+expect cd_giga > 0 b8_giga_cooling
+expect cd_giga < 1150 b8_giga_refused
+expect hud == 15 b8_hud_cooling
+log snap_b8_hud_cooling
+snap
+idle 40
+press 2 C
+idle 60
+goto 360 1080 4
+idle 40
+log giga_b3_heatnix
+pset 14C 3
+press 4 S
+idle 60
+show cd_giga hud
+expect cd_giga == 0 b3_giga_ready
+expect hud == 15 b3_hud_shown
+press 2 RIGHT
+idle 2
+press 2 V
+idle 1
+show cd_giga
+expect cd_giga > 1150 b3_giga_used
+idle 11
+log snap_b3_t12
+snap
+idle 38
+log snap_b3_t50
+snap
+idle 25
+log snap_b3_t75
+snap
+idle 25
+log snap_b3_t100
+snap
+idle 25
+log snap_b3_t125
+snap
+idle 60
+press 2 V
+idle 2
+show cd_giga hud
+expect cd_giga > 0 b3_giga_cooling
+expect cd_giga < 1150 b3_giga_refused
+expect hud == 15 b3_hud_cooling
+log snap_b3_hud_cooling
+snap
+idle 40
+press 2 C
+idle 60
+goto 360 1080 4
+idle 40
+log giga_b4_shark
+pset 14C 4
+press 4 S
+idle 60
+show cd_giga hud
+expect cd_giga == 0 b4_giga_ready
+expect hud == 15 b4_hud_shown
+press 2 RIGHT
+idle 2
+press 2 V
+idle 1
+show cd_giga
+expect cd_giga > 1150 b4_giga_used
+idle 9
+log snap_b4_t10
+snap
+idle 30
+log snap_b4_t40
+snap
+idle 30
+log snap_b4_t70
+snap
+idle 30
+log snap_b4_t100
+snap
+idle 40
+log snap_b4_t140
+snap
+idle 40
+press 2 V
+idle 2
+show cd_giga hud
+expect cd_giga > 0 b4_giga_cooling
+expect cd_giga < 1150 b4_giga_refused
+expect hud == 15 b4_hud_cooling
+log snap_b4_hud_cooling
+snap
+idle 40
+press 2 C
+idle 60
+goto 360 1080 4
+idle 40
+log giga_b6_turtloid
+pset 14C 6
+press 4 S
+idle 60
+show cd_giga hud
+expect cd_giga == 0 b6_giga_ready
+expect hud == 15 b6_hud_shown
+press 2 RIGHT
+idle 2
+press 2 V
+idle 1
+show cd_giga
+expect cd_giga > 1150 b6_giga_used
+idle 9
+log snap_b6_t10
+snap
+idle 20
+log snap_b6_t30
+snap
+idle 20
+log snap_b6_t50
+snap
+idle 30
+log snap_b6_t80
+snap
+idle 40
+log snap_b6_t120
+snap
+idle 60
+press 2 V
+idle 2
+show cd_giga hud
+expect cd_giga > 0 b6_giga_cooling
+expect cd_giga < 1150 b6_giga_refused
+expect hud == 15 b6_hud_cooling
+log snap_b6_hud_cooling
+snap
+idle 40
+press 2 C
+idle 60
+goto 360 1080 4
+idle 40
+log giga_b7_sheldon
+pset 14C 7
+press 4 S
+idle 60
+show cd_giga hud
+expect cd_giga == 0 b7_giga_ready
+expect hud == 15 b7_hud_shown
+press 2 RIGHT
+idle 2
+press 2 V
+idle 1
+show cd_giga
+expect cd_giga > 1150 b7_giga_used
+idle 9
+log snap_b7_t10
+snap
+idle 30
+log snap_b7_t40
+snap
+idle 40
+log snap_b7_t80
+snap
+idle 40
+log snap_b7_t120
+snap
+idle 60
+log snap_b7_t180
+snap
+idle 60
+log snap_b7_t240
+snap
+idle 120
+press 2 V
+idle 2
+show cd_giga hud
+expect cd_giga > 0 b7_giga_cooling
+expect cd_giga < 1150 b7_giga_refused
+expect hud == 15 b7_hud_cooling
+log snap_b7_hud_cooling
+snap
+idle 40
+press 2 C
+idle 60
+goto 360 1080 4
+idle 40
+log giga_unchange_b1
+pset 14C 1
+press 4 S
+idle 60
+press 2 RIGHT
+idle 2
+press 2 V
+idle 40
+show dna_shots
+expect dna_shots > 0 b1_giga_shots_out
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b1_giga_shots_gone
+idle 60
+goto 360 1080 4
+idle 40
+log giga_unchange_b5
+pset 14C 5
+press 4 S
+idle 60
+press 2 RIGHT
+idle 2
+press 2 V
+idle 40
+show dna_shots
+expect dna_shots > 0 b5_giga_shots_out
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b5_giga_shots_gone
+idle 60
+goto 360 1080 4
+idle 40
+log giga_unchange_b8
+pset 14C 8
+press 4 S
+idle 60
+press 2 RIGHT
+idle 2
+press 2 V
+idle 40
+show dna_shots
+expect dna_shots > 0 b8_giga_shots_out
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b8_giga_shots_gone
+idle 60
+goto 360 1080 4
+idle 40
+log giga_unchange_b3
+pset 14C 3
+press 4 S
+idle 60
+press 2 RIGHT
+idle 2
+press 2 V
+idle 40
+show dna_shots
+expect dna_shots > 0 b3_giga_shots_out
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b3_giga_shots_gone
+idle 60
+goto 360 1080 4
+idle 40
+log giga_unchange_b4
+pset 14C 4
+press 4 S
+idle 60
+press 2 RIGHT
+idle 2
+press 2 V
+idle 40
+show dna_shots
+expect dna_shots > 0 b4_giga_shots_out
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b4_giga_shots_gone
+idle 60
+goto 360 1080 4
+idle 40
+log giga_unchange_b6
+pset 14C 6
+press 4 S
+idle 60
+press 2 RIGHT
+idle 2
+press 2 V
+idle 40
+show dna_shots
+expect dna_shots > 0 b6_giga_shots_out
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b6_giga_shots_gone
+idle 60
+goto 360 1080 4
+idle 40
+log giga_unchange_b7
+pset 14C 7
+press 4 S
+idle 60
+press 2 RIGHT
+idle 2
+press 2 V
+idle 40
+show dna_shots
+expect dna_shots > 0 b7_giga_shots_out
+unchange
+idle 2
+show dna_shots
+expect dna_shots == 0 b7_giga_shots_gone
+idle 60
+end

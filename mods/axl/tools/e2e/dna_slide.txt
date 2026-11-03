@@ -1,0 +1,56 @@
+# The change's pose and leaving blink hold Axl's x (user report 2026-10-29: the boss slid forward while changing).
+# Each case changes out of a dash / a walk (or changes back out of a flight) and checks the pose (anim 204) started
+# and x did not move. (2026-11-02: a ground dash (state 12) refused the change and Axl dashed on under the beep;
+# now it changes and the pose holds x)
+all_weapons
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1080 4
+idle 40
+log slide_b1_dash
+pset 14C 1
+press 6 A RIGHT
+mark
+press 2 S RIGHT
+press 18 RIGHT
+show dx state anim
+expect anim == 204 slide_b1_dash_changed
+expect dx == 0 slide_b1_dash_pose
+idle 10
+log slide_b1_fly_leave
+press 20 A RIGHT
+mark
+press 2 C RIGHT
+press 20 RIGHT
+show dx state anim
+expect dx == 0 slide_b1_fly_leave_blink
+idle 40
+goto 360 1080 4
+idle 40
+log slide_b3_walk
+pset 14C 3
+press 10 RIGHT
+mark
+press 2 S RIGHT
+press 18 RIGHT
+show dx state anim
+expect anim == 204 slide_b3_walk_changed
+expect dx == 0 slide_b3_walk_pose
+idle 10
+press 2 C
+idle 40
+goto 360 1080 4
+idle 40
+log slide_b2_dash
+pset 14C 2
+press 6 A LEFT
+mark
+press 2 S LEFT
+press 18 LEFT
+show dx state anim
+expect anim == 204 slide_b2_dash_changed
+expect dx == 0 slide_b2_dash_pose
+end
