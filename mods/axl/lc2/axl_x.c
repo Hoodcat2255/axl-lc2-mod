@@ -11,11 +11,8 @@
 #include <math.h>
 
 #include "axl_lc2.h"
-#include "axl_dna_looks.h"   /* SHOT_DIRS, SHOT_BASE, SHOT_NFLY, FX_TEX_INDEX, FX_PAT: the turned bullet pictures */
+#include "axl_data.h"      /* the game-derived tables (axl_data.bin) */
 #include "axl_proj.h"
-#include "axl_gen.h"
-#include "axl_anims.h"   /* AXL_ROLL_LEN (its tables unused here) */
-#include "axl_pal.h"     /* axl_body_pal (lc2_hook.py) */
 #include "axl_test.h"   /* PS1 build constants: tip_crouch, tip_wall, tip_rope, ROPE_AIM_ANIM (copied by lc2_hook.py) */
 
 typedef unsigned char u8;
@@ -1267,7 +1264,7 @@ static unsigned short jet_orig[16];
 static int jet_spot(char *p)
 {
     unsigned i;
-    for (i = 0; i < sizeof flame_frames; i++)
+    for (i = 0; i < N_FLAME_FRAMES; i++)
         if (flame_frames[i] == O8(p, 0x66))
             return (int)i;
     return -1;
@@ -1908,11 +1905,11 @@ static void white_axl(void)
         warned = blob;
         return;
     }
-    for (i = 0; i < sizeof body_pals; i++)
+    for (i = 0; i < N_BODY_PALS; i++)
         memcpy(blob + 16 * body_pals[i], white_pal, sizeof white_pal);
     X_PAL_UPLOAD(*(void **)0x041D8C8C);
     if (test_on)
-        test_log("white axl: palettes %u", (unsigned)sizeof body_pals);
+        test_log("white axl: palettes %u", (unsigned)N_BODY_PALS);
 }
 
 void axl_post(char *self)

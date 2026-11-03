@@ -17,7 +17,7 @@
 
 #include "axl_lc2.h"
 #include "axl_proj.h"
-#include "axl_hud_looks.h"
+#include "axl_data.h"      /* the game-derived tables (axl_data.bin) */
 #include "axl_test.h"
 
 #define O8(p, o) (*(volatile unsigned char *)((p) + (o)))

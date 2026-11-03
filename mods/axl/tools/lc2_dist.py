@@ -10,7 +10,8 @@ Patcher by hand. No executable goes in the package. Patches without secondary co
 --no-skills: the DLL built with AXL_NO_SKILLS (no cooldowns, skill HUD or boss giga attacks: test5, 2026-11-04).
 
 Builds first (lc2_build.py, lc2_hook.py --release: the DLL without the test harness / options file, lc2_selftest.py)
-and stops if any of it fails. The package mirrors the game folder: dinput8.dll at the top, the archives under
+and stops if any of it fails. The package mirrors the game folder: dinput8.dll and axl_data.bin (its tables, read
+from next to it: lc2/axl_data.h) at the top, the archives under
 nativeDX10/X6/romPC/, with README.md (install / uninstall / controls) and CREDITS.md. Nothing of the testing aids goes
 in: no axl_options.txt (all_weapons), no axl_test.txt.
 """
@@ -42,7 +43,8 @@ This is a test build: please report what looks or plays wrong.
    (pl02.arc, pl02_eng.arc, kao.arc, stsel_eng.arc, cledit_eng_reg_wor.arc). Steam's "Verify integrity of game
    files" also restores them.
 2. Copy everything in this folder into the game folder (`steamapps/common/Mega Man X Legacy Collection 2`), keeping
-   the folder structure: `dinput8.dll` next to `RXC2.exe`, the archives into `nativeDX10/X6/romPC/`.
+   the folder structure: `dinput8.dll` and `axl_data.bin` next to `RXC2.exe`, the archives into
+   `nativeDX10/X6/romPC/`.
 3. Windows: nothing else. Linux / Steam Deck (Proton): set the game's launch options to
    `WINEDLLOVERRIDES="dinput8=n,b" %command%`.
 
@@ -53,7 +55,7 @@ unmodded game runs there (Steam "Verify integrity of game files", no `dinput8.dl
 
 ## Uninstall
 
-Delete `dinput8.dll` from the game folder and run Steam's "Verify integrity of game files".
+Delete `dinput8.dll` and `axl_data.bin` from the game folder and run Steam's "Verify integrity of game files".
 
 ## Controls (X6's defaults; play as normal X, not the armours)
 
@@ -78,7 +80,7 @@ What changed: PATCHNOTES.md (Korean).
 - 노멀 엑스가 액셀(록맨 X8)이 됩니다. 테스트 빌드입니다.
 - 설치: 위 아카이브 5개를 백업하고(스팀 "게임 파일 무결성 확인"으로도 복원됨), 이 폴더 내용을 게임 폴더에
   구조 그대로 복사합니다. 리눅스·스팀덱은 실행 옵션에 `WINEDLLOVERRIDES="dinput8=n,b" %command%`.
-- 제거: `dinput8.dll`을 지우고 스팀 "게임 파일 무결성 확인".
+- 제거: `dinput8.dll`과 `axl_data.bin`을 지우고 스팀 "게임 파일 무결성 확인".
 - 리눅스(Proton)와 윈도우(test3)에서 실행을 확인했습니다. 윈도우에서 튕기면 먼저 원본 게임(무결성 확인, dll 없음)이
   실행되는지 확인해 주세요.
 - 조작: 사격 연사·8방향 조준, 공중 점프 = 호버, 공중 대시, 땅에서 R = 구르기(구르는 동안 무적),
@@ -112,7 +114,7 @@ Running the patcher again is safe: archives already patched are left alone. Each
   double-click it - it finds the game through Steam - or run `apply_windows.bat "<game folder>"`.
   Without xdelta3.exe: Delta Patcher (https://github.com/marco-calautti/DeltaPatcher/releases), for each file in
   `patches/`: "Original file" = `<game folder>\\nativeDX10\\X6\\romPC\\<name>.arc`, "XDelta patch" =
-  `patches\\<name>.arc.xdelta`, Apply (keep the backup it offers); then copy `dinput8.dll` next to `RXC2.exe`.
+  `patches\\<name>.arc.xdelta`, Apply (keep the backup it offers); then copy `dinput8.dll` and `axl_data.bin` next to `RXC2.exe`.
 
 """
 
@@ -185,6 +187,7 @@ def main(version=None, xdelta=False, no_skills=False):
         for fn in I.FILES:
             shutil.copy2(os.path.join(F.BUILT, fn), os.path.join(rom, fn))
     shutil.copy2(os.path.join(F.BUILT, 'release', I.DLL), os.path.join(dest, I.DLL))
+    shutil.copy2(os.path.join(F.BUILT, I.DATA), os.path.join(dest, I.DATA))   # (lc2_hook.py packed it with the DLL)
     shutil.copy2(os.path.join(ROOT, 'mods', 'axl', 'CREDITS.md'), os.path.join(dest, 'CREDITS.md'))
     shutil.copy2(os.path.join(ROOT, 'mods', 'axl', 'PATCHNOTES.md'), os.path.join(dest, 'PATCHNOTES.md'))
     open(os.path.join(dest, 'README.md'), 'w').write(readme)

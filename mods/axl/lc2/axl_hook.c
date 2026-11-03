@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "axl_anims.h"
+#include "axl_data.h"      /* the game-derived tables (axl_data.bin) */
 #include "axl_lc2.h"
 #include "axl_proj.h"
 #include "axl_test.h"
@@ -31,7 +31,8 @@
 #define KBD_READ       0x01E74FA0u   /* keyboard read (thiscall, 1 arg; GetAsyncKeyState x 256 when the DirectInput
                                         keyboard is null, as under Proton): once per input update = the harness's frame */
 
-void *axl_table[AXL_N_TABLE];
+void *axl_table[AXL_TABLE_MAX];
+extern HINSTANCE axl_module;   /* axl_data.c */
 
 /* X's table is filled by the game's start-up code: copied on the first player frame */
 void axl_table_init(void)
@@ -322,6 +323,14 @@ static void install(void)
     if (InterlockedExchange(&installed, 1))
         return;
     test_init();
+    /* the game-derived tables (axl_data.bin next to this DLL): without them nothing is patched */
+    if (!axl_data_load()) {
+#ifndef AXL_RELEASE
+        OutputDebugStringA("axl_lc2: " AXL_DATA_FILE " missing or not for this build, hooks not installed\n");
+        test_log(AXL_DATA_FILE " missing or not for this build, hooks not installed");
+#endif
+        return;
+    }
 #ifndef AXL_RELEASE
     read_options();   /* (the release build: no options - the testing ones, all_weapons) */
 #endif
@@ -604,7 +613,9 @@ HRESULT WINAPI DirectInput8Create(HINSTANCE inst, DWORD ver, REFIID riid, LPVOID
 BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved)
 {
     (void)reserved;
-    if (reason == DLL_PROCESS_ATTACH)
+    if (reason == DLL_PROCESS_ATTACH) {
+        axl_module = inst;   /* (axl_data.c: axl_data.bin is next to this DLL) */
         DisableThreadLibraryCalls(inst);
+    }
     return TRUE;
 }

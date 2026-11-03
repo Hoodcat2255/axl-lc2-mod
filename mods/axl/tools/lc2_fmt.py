@@ -29,6 +29,7 @@ DAT = {'us': os.path.join(C.X6_US_FS, 'ROCK_X6.DAT'),
        'axl': os.path.join(ROOT, 'mods', 'axl', 'work', 'build', 'patch', 'ROCK_X6.DAT')}
 BUILT = os.path.join(ROOT, 'mods', 'axl', 'work', 'lc2')   # lc2_build.py output
 BACKUP = os.path.join(BUILT, 'backup')                     # pristine copies (lc2_install.py)
+GEN = os.path.join(BUILT, 'gen')   # headers made from the game data (lc2_build / lc2_hook), packed into axl_data.bin
 # normal X's archives: file -> (PS1 data it carries, PAT entry name)
 STSEL = 'stsel_eng.arc'   # stage select: PLAYER SELECT shows "AXL" for the normal X (lc2_build.build_stsel)
 KAO = 'kao.arc'   # dialogue portraits: k_plNN_000 (TEX, PS1 DAT entry 163 + 2N) + col k_plNN (COL, entry 164 + 2N)

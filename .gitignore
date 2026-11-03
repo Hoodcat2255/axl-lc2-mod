@@ -6,12 +6,7 @@ __pycache__/
 /config.local.json
 /games/
 
-# written by the build from the user's game data
-/mods/axl/lc2/axl_anims.h
-/mods/axl/lc2/axl_dna_looks.h
-/mods/axl/lc2/axl_hud_looks.h
-/mods/axl/lc2/axl_gen.h
-/mods/axl/lc2/axl_pal.h
+# written by the build from the user's game data (the generated headers and axl_data.bin: mods/axl/work/lc2/)
 /mods/axl/sound/
 /mods/axl/tools/bin/
 

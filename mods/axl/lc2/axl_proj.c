@@ -18,7 +18,7 @@
 
 #include "axl_lc2.h"
 #include "axl_proj.h"
-#include "axl_dna_looks.h"   /* FX_TEX_INDEX, FX_PAT, DNA_PAL_SLOT */
+#include "axl_data.h"      /* the game-derived tables (axl_data.bin) */
 #include "axl_test.h"
 
 #define O8(p, o) (*(volatile unsigned char *)((p) + (o)))

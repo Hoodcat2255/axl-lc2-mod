@@ -1,5 +1,6 @@
 #!/bin/sh
-# Axl mod (Mega Man X Legacy Collection 2): patch the game's 5 archives, keep <name>.orig, copy dinput8.dll.
+# Axl mod (Mega Man X Legacy Collection 2): patch the game's 5 archives, keep <name>.orig, copy dinput8.dll and
+# axl_data.bin (the DLL's tables).
 #
 #   sh apply_linux.sh                 the game folder found in the Steam libraries (native, Flatpak, Steam Deck)
 #   sh apply_linux.sh "<game folder>" that folder (steamapps/common/Mega Man X Legacy Collection 2)
@@ -58,5 +59,6 @@ while read -r want_old want_new name; do
   mv "$f.new" "$f"
   echo "$name: patched"
 done < "$here/SHA1SUMS.txt"
+cp "$here/axl_data.bin" "$game/axl_data.bin"
 cp "$here/dinput8.dll" "$game/dinput8.dll"
 echo 'done. Steam launch options: WINEDLLOVERRIDES="dinput8=n,b" %command%'

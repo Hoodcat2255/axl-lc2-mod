@@ -1,0 +1,33 @@
+# dinput8.dll from this repository alone (no game data): the release build and the --no-skills one
+name: build-dll
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install zig
+        run: python -m pip install ziglang==0.17.0
+      - name: Build dinput8.dll
+        run: |
+          python mods/axl/tools/lc2_dll.py --release --out dist/release/dinput8.dll
+          python mods/axl/tools/lc2_dll.py --release --no-skills --out dist/release-no-skills/dinput8.dll
+          cd dist && sha256sum */dinput8.dll | tee SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dinput8-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error

@@ -1,5 +1,6 @@
 @echo off
-rem Axl mod (Mega Man X Legacy Collection 2): patch the game's 5 archives, keep <name>.orig, copy dinput8.dll.
+rem Axl mod (Mega Man X Legacy Collection 2): patch the game's 5 archives, keep <name>.orig, copy dinput8.dll and
+rem axl_data.bin (the DLL's tables).
 rem
 rem   Put xdelta3.exe (https://github.com/jmacd/xdelta-gpl/releases) next to this file, then
 rem   double-click this file          the game folder found through Steam (registry, library folders)
@@ -31,6 +32,7 @@ if not exist "%GAME%\RXC2.exe" goto bad_game
 if not exist "%HERE%xdelta3.exe" goto no_xdelta
 set "ROM=%GAME%\nativeDX10\X6\romPC"
 for /f "usebackq tokens=1,2,3" %%a in ("%HERE%SHA1SUMS.txt") do call :one "%%a" "%%b" "%%c" || goto failed
+copy /y "%HERE%axl_data.bin" "%GAME%\axl_data.bin" >nul || goto failed
 copy /y "%HERE%dinput8.dll" "%GAME%\dinput8.dll" >nul || goto failed
 echo done.
 set "RC=0"

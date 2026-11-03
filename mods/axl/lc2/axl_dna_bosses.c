@@ -8,9 +8,8 @@
 
 #include "axl_lc2.h"
 #include "axl_proj.h"
-#include "axl_gen.h"
+#include "axl_data.h"      /* the game-derived tables (axl_data.bin) */
 #include "axl_test.h"   /* FX_*: the bosses' projectile anims in Axl's table */
-#include "axl_hud_looks.h"   /* HUD_TEX_INDEX, HUD_PAT, GIGA_*: the giga attacks' pictures */
 
 #define FXP(n) ((int)((n) * 65536))
 #define PX(p) (*(volatile float *)((p) + 0x14))

@@ -1,6 +1,6 @@
 /* Shared declarations of the Axl DLL for Legacy Collection 2 (addresses: re/lc2/codemap.md) */
 #define N_X_ANIMS 193                       /* X's anims (PS1 0x801F4AD4) */
-#define X_TABLE ((void **)0x03480798)        /* the player X's table on PC (8-byte entries, axl_anims.h) */
+#define X_TABLE ((void **)0x03480798)        /* the player X's table on PC (8-byte entries, axl_data.h axl_ent) */
 #define ZERO_TABLE ((void **)0x03480AF0)
 #define P_OF(self) (*(char **)((self) + 0xD4))   /* the player work */
 #define ANIM_COMP 0x24                       /* P + 0x24: anim component (PS1 obj + 0x30 = P + 0x4C) */

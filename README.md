@@ -2,12 +2,14 @@
 
 A fan mod for the Steam release of **Mega Man X Legacy Collection 2**: in X6, normal X becomes Axl (Mega Man X8) -
 his gun with 8-way aim, hover, air dash, dodge roll, the copy shot and DNA Change into the eight Mavericks.
-It is a `dinput8.dll` hook (C, built with zig) plus rebuilt game archives (`pl02*.arc`, `kao.arc`, `stsel_eng.arc`,
-`cledit_eng_reg_wor.arc`).
+It is a `dinput8.dll` hook (C, built with zig) with its data file `axl_data.bin`, plus rebuilt game archives
+(`pl02*.arc`, `kao.arc`, `stsel_eng.arc`, `cledit_eng_reg_wor.arc`).
 
 **No game data is in this repository.** Every picture, sound, table or archive the mod needs is made by the build
-from your own copies of the games. Releases ship the DLL and xdelta patches against your own archives
-(`lc2_dist.py --xdelta`).
+from your own copies of the games. The DLL itself is built from this repository alone (the game-derived tables are
+in `axl_data.bin`, which it reads at start-up), so GitHub Actions builds it with no game files
+(`.github/workflows/build-dll.yml`). Releases ship the DLL, `axl_data.bin` and xdelta patches against your own
+archives (`lc2_dist.py --xdelta`).
 
 What changed between test builds: `mods/axl/PATCHNOTES.md` (Korean). Credits: `mods/axl/CREDITS.md`.
 
@@ -68,30 +70,54 @@ cp config.example.json config.local.json
 P=.venv/bin/python
 $P mods/axl/tools/build_axl.py mods/axl/work/build --lc2   # PS1 step: Axl's sprites, scripts, axl_gen.h
 $P mods/axl/tools/lc2_build.py                              # -> mods/axl/work/lc2/*.arc (+ generated headers)
-$P mods/axl/tools/lc2_hook.py                               # -> mods/axl/work/lc2/dinput8.dll (with the test harness)
+$P mods/axl/tools/lc2_hook.py                               # -> mods/axl/work/lc2/axl_data.bin, dinput8.dll (test harness)
 $P mods/axl/tools/lc2_hook.py --release                     # -> mods/axl/work/lc2/release/dinput8.dll
 $P mods/axl/tools/lc2_selftest.py                           # silent = passed
 ```
 
+The DLL alone, without any game data (what the CI workflow runs):
+
+```sh
+python mods/axl/tools/lc2_dll.py --release [--no-skills] [--out PATH]   # Python standard library + ziglang
+```
+
+### The data file `axl_data.bin`
+
+The DLL's game-derived tables (Axl's animation scripts, the bosses' palettes and pose sequences, picture indices of
+the rebuilt archives, ...) are not compiled in. The build writes them as C headers into `mods/axl/work/lc2/gen/`
+(`lc2_build.py` via `lc2_dna.py`, `lc2_hook.py`, and `build_axl.py`'s `axl_gen.h`), then `lc2_data.py pack` (run by
+`lc2_hook.py`) compiles `mods/axl/lc2/data/axl_data_pack.c` with them for the build machine and writes
+`mods/axl/work/lc2/axl_data.bin`: the structure `axl_data_t` of `mods/axl/lc2/axl_data.h` with a magic number, a
+format version, its size and an FNV-1a hash. `lc2_install.py install` and the release's apply scripts put it next
+to `dinput8.dll`; at start-up the DLL reads it from there and, if it is missing or its magic, version, size or hash
+does not match, installs no hook at all (the game runs unmodded). `lc2_data.py check` and `lc2_selftest.py` check
+the file.
+
 `build_axl.py` without `--lc2` also builds the PS1 disc image, which needs the PS1 C sources (`mods/axl/src`, not
 part of this repository). Run it again after editing the sheet data.
 
-`--no-skills` (lc2_hook.py, lc2_dist.py): the DLL without the boss skill cooldowns, skill HUD and boss Giga attacks.
+`--no-skills` (lc2_hook.py, lc2_dll.py, lc2_dist.py): the DLL without the boss skill cooldowns, skill HUD and boss
+Giga attacks. The DLL's version (its VERSIONINFO resource, `mods/axl/lc2/axl_version.rc`) comes from
+`mods/axl/VERSION`.
 
 ## Install / release
 
 - Your own game: `$P mods/axl/tools/lc2_install.py install` (keeps the shipped archives in `mods/axl/work/lc2/backup/`,
-  copies the build and the DLL; on Linux it also sets the Proton prefix's `dinput8` override). `restore` undoes it.
+  copies the build, the DLL and `axl_data.bin`; on Linux it also sets the Proton prefix's `dinput8` override).
+  `restore` undoes it.
 - Release package: `$P mods/axl/tools/lc2_dist.py VERSION --xdelta [--no-skills]` -> `mods/axl/work/dist/`:
-  `dinput8.dll`, xdelta patches against the shipped archives, `SHA1SUMS.txt`, `apply_linux.sh` / `apply_windows.bat` /
+  `dinput8.dll`, `axl_data.bin`, xdelta patches against the shipped archives, `SHA1SUMS.txt`, `apply_linux.sh` / `apply_windows.bat` /
   `apply_xdelta.py`, README (install for players), CREDITS, PATCHNOTES. No game file goes in it.
 - In-game tests (`lc2_test.py`, `lc2_e2e.py`, `lc2_regress.py`, scenarios in `mods/axl/tools/e2e/`) start the game
   through Steam with the debug DLL and log what the scenario checks.
 
 ## Layout
 
-- `mods/axl/lc2/` - the DLL (C). `axl_anims.h`, `axl_dna_looks.h`, `axl_hud_looks.h`, `axl_gen.h`, `axl_pal.h` are
-  written by the build from your game data and are not committed.
+- `mods/axl/lc2/` - the DLL (C); `axl_data.h` the data file's layout, `data/axl_data_pack.c` its packer. The
+  generated headers (`axl_anims.h`, `axl_dna_looks.h`, `axl_hud_looks.h`, `axl_gen.h`, `axl_pal.h`) and
+  `axl_data.bin` are written by the build from your game data under `mods/axl/work/lc2/` and are not committed.
+- `.github/workflows/build-dll.yml` - builds `dinput8.dll` (release, and the `--no-skills` variant) on every push and
+  tag, from this repository only, and keeps it as a workflow artifact.
 - `mods/axl/tools/` - build, install, dist and test tools (Python); `axl_config.py` - where your data is.
 - `mods/axl/work/sheet/`, `mods/axl/work/face/` - the mod's own edit data (sheet cuts, placements, animation edits,
   portrait layout); everything else under `work/` is build output.
@@ -101,6 +127,22 @@ part of this repository). Run it again after editing the sheet data.
 - 레거시 컬렉션 2(스팀)의 X6에서 노멀 엑스를 액셀로 바꾸는 팬 모드의 소스입니다. 게임 데이터는 들어 있지 않고,
   빌드가 사용자 자신의 게임(레거시 컬렉션 2, PS1 록맨 X6 북미 v1.1 이미지)과 따로 받은 스프라이트 시트에서 만듭니다.
 - 준비: 위 "What you need"와 "Setup", 빌드: "Build". 배포본은 `lc2_dist.py 버전 --xdelta --no-skills`.
+- DLL은 게임 데이터 없이 이 저장소만으로 빌드됩니다(GitHub Actions). 게임에서 뽑은 표는 빌드가 `axl_data.bin`으로
+  만들고, DLL이 시작할 때 자기 옆의 이 파일을 읽습니다. 파일이 없거나 맞지 않으면 아무것도 바꾸지 않습니다.
+
+## Code signing policy
+
+- What is signed: only `dinput8.dll`, as built by the `build-dll` GitHub Actions workflow
+  (`.github/workflows/build-dll.yml`) from a tagged commit of this repository. Nothing else is signed: not
+  `axl_data.bin` (made on the user's machine from the user's game data), the patches or the scripts.
+- The workflow builds from source only: the C sources in `mods/axl/lc2/` and `mods/axl/tools/lc2_dll.py`, compiled
+  with zig (`ziglang` from PyPI, the version pinned in `requirements.txt`). No game data, prebuilt binaries or
+  proprietary components go into the DLL. The file carries its product name and version (VERSIONINFO, from
+  `mods/axl/VERSION`).
+- Committers and reviewers: hoodcat (https://github.com/Hoodcat2255). Approvers: hoodcat - every signing request is
+  approved by the maintainer by hand, for release tags only.
+- Privacy: this program does not transfer any information to other networked systems. The DLL opens no network
+  connection; it only reads `axl_data.bin` next to itself and patches the running game in memory.
 
 ## Disclaimer
 

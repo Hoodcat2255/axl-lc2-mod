@@ -5,12 +5,13 @@ usage: lc2_install.py install | restore | status | options [all_weapons ...]
 install: on first use copies the shipped pl02.arc / pl02_eng.arc to mods/axl/work/lc2/backup/ (sha1 in SHA1SUMS),
          then copies mods/axl/work/lc2/*.arc over the game's files. Refuses when the game's file is not the shipped
          one and there is no backup yet (a backup must never hold a modified file).
-         Also copies mods/axl/work/lc2/dinput8.dll (lc2_hook.py) next to RXC2.exe; the game ships no dinput8.dll,
+         Also copies mods/axl/work/lc2/dinput8.dll and axl_data.bin (lc2_hook.py: the DLL's game-derived tables, it
+         installs no hook without them) next to RXC2.exe; the game ships no dinput8.dll,
          and sets "dinput8"="native,builtin" in the game's Proton prefix (compatdata/743900/pfx/user.reg,
          [Software\\Wine\\DllOverrides]) so a plain Steam launch loads it (no launch option needed).
 options: writes axl_options.txt next to RXC2.exe with the given words (none = removes it); all_weapons = every
          boss weapon owned from the intro stage on (testing the DNA Change).
-restore: copies the backups back, removes that dinput8.dll and the prefix override.
+restore: copies the backups back, removes that dinput8.dll, axl_data.bin and the prefix override.
 Steam's "Verify integrity of game files" also restores the shipped files.
 """
 import hashlib
@@ -26,6 +27,7 @@ import lc2_fmt as F  # noqa: E402
 
 FILES = tuple(F.PL02) + (F.KAO, F.STSEL, 'cledit_eng_reg_wor.arc')   # (+ the staff roll: lc2_credits)
 DLL = 'dinput8.dll'
+DATA = 'axl_data.bin'   # (lc2/axl_data.h: next to the DLL)
 OPTIONS = 'axl_options.txt'
 GAME_DIR = os.path.normpath(os.path.join(F.ROMPC, '..', '..', '..'))   # .../Mega Man X Legacy Collection 2
 USER_REG = os.path.normpath(os.path.join(GAME_DIR, '..', '..', 'compatdata', '743900', 'pfx', 'user.reg'))
@@ -151,11 +153,12 @@ def install():
             sys.exit('missing %s: run lc2_build.py first' % src)
         copy_atomic(src, os.path.join(F.ROMPC, fn))
         print('installed %s (sha1 %s)' % (fn, sha1(src)[:12]))
-    src = os.path.join(F.BUILT, DLL)
-    if not os.path.exists(src):
-        sys.exit('missing %s: run lc2_hook.py first' % src)
-    copy_atomic(src, os.path.join(GAME_DIR, DLL))
-    print('installed %s (sha1 %s)' % (DLL, sha1(src)[:12]))
+    for fn in (DATA, DLL):
+        src = os.path.join(F.BUILT, fn)
+        if not os.path.exists(src):
+            sys.exit('missing %s: run lc2_hook.py first' % src)
+        copy_atomic(src, os.path.join(GAME_DIR, fn))
+        print('installed %s (sha1 %s)' % (fn, sha1(src)[:12]))
     prefix_override(True)
 
 
@@ -164,13 +167,14 @@ def restore():
         src = checked_backup(fn)
         copy_atomic(src, os.path.join(F.ROMPC, fn))
         print('restored %s (sha1 %s)' % (fn, sha1(src)[:12]))
-    dll = os.path.join(GAME_DIR, DLL)
-    if os.path.exists(dll):
-        built = os.path.join(F.BUILT, DLL)
-        if not os.path.exists(built) or sha1(dll) != sha1(built):
-            sys.exit('not removing %s: it is not the Axl hook build' % dll)
-        os.remove(dll)
-        print('removed %s' % DLL)
+    for fn in (DLL, DATA):
+        path = os.path.join(GAME_DIR, fn)
+        if os.path.exists(path):
+            built = os.path.join(F.BUILT, fn)
+            if not os.path.exists(built) or sha1(path) != sha1(built):
+                sys.exit('not removing %s: it is not the Axl hook build' % path)
+            os.remove(path)
+            print('removed %s' % fn)
     prefix_override(False)
     options()
 
@@ -196,9 +200,10 @@ def status():
                  'Axl build' if os.path.exists(built) and g == sha1(built) else
                  'shipped (no backup yet)' if is_shipped(game, fn) else 'other')
         print('%s: %s (sha1 %s)' % (fn, state, g[:12]))
-    dll, built = os.path.join(GAME_DIR, DLL), os.path.join(F.BUILT, DLL)
-    print('%s: %s' % (DLL, 'not installed' if not os.path.exists(dll) else
-                      'Axl hook' if os.path.exists(built) and sha1(dll) == sha1(built) else 'other'))
+    for fn in (DLL, DATA):
+        path, built = os.path.join(GAME_DIR, fn), os.path.join(F.BUILT, fn)
+        print('%s: %s' % (fn, 'not installed' if not os.path.exists(path) else
+                          'Axl hook' if os.path.exists(built) and sha1(path) == sha1(built) else 'other'))
     if os.path.exists(USER_REG):
         print('prefix override: %s' % ('set' if OVERRIDE in open(USER_REG, encoding='utf-8').read().split('\n')
                                        else 'not set'))

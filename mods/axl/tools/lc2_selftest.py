@@ -3,6 +3,8 @@
 1. codec round trip on original data: PS1 US/JP DAT 86 -> PAT/COL/TEX/COF equal the shipped pl02_eng / pl02 entries
 2. ARC rebuild: parse + rebuild reproduces every entry
 3. (when built) mods/axl/work/lc2/*.arc: Axl frames render the same as from the Axl PS1 DAT 86
+4. mods/axl/work/lc2/axl_data.bin (the DLL's tables): magic, version, size and hash as lc2/axl_data.h, not older than
+   the generated headers it is packed from
 """
 import os
 import struct
@@ -133,9 +135,19 @@ def built(fn):
     return n
 
 
+def data():
+    import lc2_data
+    err = lc2_data.check()
+    check(not err, 'axl_data.bin: ' + err)
+    if not err:
+        gen = [os.path.join(lc2_data.GEN, h) for h in lc2_data.HEADERS]
+        newest = max((os.path.getmtime(g) for g in gen if os.path.exists(g)), default=0)
+        check(os.path.getmtime(lc2_data.DATA) >= newest, 'axl_data.bin older than %s (run lc2_hook.py)' % lc2_data.GEN)
+
+
 def main():
     verbose = '-v' in sys.argv
-    stages = [a for a in sys.argv[1:] if a != '-v'] or ['codec', 'arc', 'built']
+    stages = [a for a in sys.argv[1:] if a != '-v'] or ['codec', 'arc', 'built', 'data']
     counts = {}
     for region in F.PL02:
         if 'codec' in stages:
@@ -144,6 +156,8 @@ def main():
             arc_rebuild(region)
         if 'built' in stages:
             counts[region] = built(region)
+    if 'data' in stages:
+        data()
     info = [f for f in fails if 'informational' in f]
     real = [f for f in fails if 'informational' not in f]
     for f in info if verbose else []:
