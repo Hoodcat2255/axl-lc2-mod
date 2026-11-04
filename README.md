@@ -1,4 +1,6 @@
-# Axl mod for Mega Man X6 (Mega Man X Legacy Collection 2)
+# Axl mod for Mega Man X6 (LC2)
+
+(LC2: Mega Man X Legacy Collection 2. This is the product name in the DLL's version resource.)
 
 A fan mod for the Steam release of **Mega Man X Legacy Collection 2**: in X6, normal X becomes Axl (Mega Man X8) -
 his gun with 8-way aim, hover, air dash, dodge roll, the copy shot and DNA Change into the eight Mavericks.
@@ -134,7 +136,8 @@ Giga attacks. The DLL's version (its VERSIONINFO resource, `mods/axl/lc2/axl_ver
 
 - What is signed: only `dinput8.dll`, as built by the `build-dll` GitHub Actions workflow
   (`.github/workflows/build-dll.yml`) from a tagged commit of this repository. Nothing else is signed: not
-  `axl_data.bin` (made on the user's machine from the user's game data), the patches or the scripts.
+  `axl_data.bin` (the game-derived tables: made by the build from the maintainer's copy of the game, shipped
+  next to the DLL in the release package, read as data only), the patches or the scripts.
 - The workflow builds from source only: the C sources in `mods/axl/lc2/` and `mods/axl/tools/lc2_dll.py`, compiled
   with zig (`ziglang` from PyPI, the version pinned in `requirements.txt`). No game data, prebuilt binaries or
   proprietary components go into the DLL. The file carries its product name and version (VERSIONINFO, from
