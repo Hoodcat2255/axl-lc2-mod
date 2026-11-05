@@ -1,0 +1,54 @@
+# Shooting on a rope keeps Axl drawn (user report 2026-11-05: shooting up / down on a rope he vanished): the rope aims
+# of poses 2 / 3 had the PS1 anim numbers 229-232, which on PC are the wall aims and the Giga Crush pictures (bank B
+# frame 216 drawn: nothing) - now anims 252-255 (axl_x.c ROPE_AIM, lc2_hook.ROPE_AIM_HI). The intro's level rope
+# (pose 3, x 2368-2560, y 1008): forward, up-diagonal, down-diagonal, each 60 frames held; the picture is bank B 72 /
+# 73 (texture 10, PAT section 18) and the shots go on (rapid fire).
+all_weapons
+seq
+wait free == 1 9000
+god on
+ghost on
+log rope_grab
+goto 2440 1105 4
+idle 20
+hold UP Z
+idle 40
+hold UP
+idle 20
+release
+idle 20
+show p_0D anim px py
+expect p_0D == 28 rope_on
+log rope_forward
+mark
+press 30 X
+snap
+press 30 X
+show bullets p_0D anim p_66
+expect bullets >= 8 rope_forward_rapid
+expect p_0D == 28 rope_forward_still_on
+idle 30
+log rope_up_diagonal
+mark
+press 30 X UP
+show p_0D anim p_66 p_54 p_58
+snap
+expect anim == 254 rope_up_diagonal_anim
+expect p_66 == 72 rope_up_diagonal_drawn
+press 30 X UP
+show bullets
+expect bullets >= 8 rope_up_diagonal_rapid
+idle 30
+log rope_down_diagonal
+mark
+press 30 X DOWN
+show p_0D anim p_66
+snap
+expect anim == 255 rope_down_diagonal_anim
+expect p_66 == 73 rope_down_diagonal_drawn
+press 30 X DOWN
+show bullets
+expect bullets >= 8 rope_down_diagonal_rapid
+expect p_0D == 28 rope_still_on
+idle 30
+end

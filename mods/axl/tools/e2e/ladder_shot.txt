@@ -1,0 +1,53 @@
+# Rapid fire and aims on a ladder (user report 2026-11-05: on a ladder a held shot fired once): X's ladder shot is
+# state 32, then 16 until he climbs - the held button now fires on through them (axl_x.c on_ladder). The intro
+# ladder (x 2000-2015): hold the shot 60 frames forward, up, down-diagonal; a held button makes a bullet every
+# RAPID (6) frames, as on the ground (about 10).
+all_weapons
+seq
+wait free == 1 9000
+god on
+ghost on
+log ladder_ground
+mark
+press 60 X
+show bullets
+expect bullets >= 8 ladder_ground_rapid
+idle 30
+log ladder_forward
+goto 2008 1105 4
+idle 20
+press 30 UP
+idle 10
+show p_0D anim py
+expect p_0D == 15 ladder_on
+mark
+press 60 X
+show bullets p_0D anim
+expect bullets >= 8 ladder_forward_rapid
+snap
+idle 30
+log ladder_up
+mark
+hold X UP
+idle 30
+show p_0D anim p_66
+expect anim == 183 ladder_up_aim
+snap
+idle 30
+release
+show bullets
+expect bullets >= 8 ladder_up_rapid
+idle 30
+log ladder_down_diagonal
+mark
+hold X DOWN RIGHT
+idle 30
+show p_0D anim p_66
+expect anim == 185 ladder_down_diagonal_aim
+idle 30
+release
+show bullets
+expect bullets >= 8 ladder_down_diagonal_rapid
+expect p_0D != 0 ladder_still_on
+idle 30
+end

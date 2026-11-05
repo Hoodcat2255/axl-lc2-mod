@@ -69,6 +69,9 @@ typedef int s32;
 static int adash_kick;         /* the air dash was started in a wall kick */
 static int adash_right;        /* the air dash's way */
 #define ST_LADDER 15          /* on a ladder (PS1 FUN_8003b7b4; 14 = getting on / off its top) */
+/* X's ladder shot is state 32, then 16 until he climbs again (user report 2026-11-05: no rapid fire on a ladder - only
+ * state 15 counted, so a held button fired once and the aims never came) */
+#define on_ladder(st) ((st) == ST_LADDER || (st) == 16 || (st) == 32)
 #define ANIM_LADDER_SHOT 92   /* X's ladder shot (frame 150) */
 #define ANIM_LADDER_AIM 183   /* + 0 up, 1 up-diagonal, 2 down-diagonal, 3 down: bank B 74-77 (lc2_hook.PC_SCRIPTS) */
 #define HOVER_MAX 50
@@ -107,7 +110,12 @@ typedef void(__fastcall *set_byte_t)(char *obj, void *edx, int v);
 
 /* rope (PS1 FUN_80039984): 27 = under a bar, 28 = on a rope. X's rope anims 144-168 (bank B) -> pose (build_axl.py
  * ZIP_X: 0 bar, 1 / 2 slope, 3 level; 0xff none). Shooting, up / down aim the diagonals: Axl's anims
- * ROPE_AIM_ANIM + 2 * pose (+1 down); forward is X's own buster anim */
+ * ROPE_AIM_ANIM + 2 * pose (+1 down); forward is X's own buster anim. On PC the wall aims (229, 230) and the Giga
+ * Crush pictures (231..) took the PS1 numbers of poses 2 and 3 (user report 2026-11-05: shooting up / down on a
+ * rope Axl vanished - bank B frame 216 drawn): those four are ROPE_AIM_HI.. (lc2_hook.ROPE_AIM_HI, bank B 70-73) */
+#define ROPE_AIM_HI 252
+#define ROPE_AIM(k) ((k) < 4 ? ROPE_AIM_ANIM + (k) : ROPE_AIM_HI + (k) - 4)   /* k = 2 * pose (+1 down) */
+#define IS_ROPE_AIM(a) (((a) >= ROPE_AIM_ANIM && (a) < ROPE_AIM_ANIM + 4) || ((a) >= ROPE_AIM_HI && (a) < ROPE_AIM_HI + 4))
 static const u8 rope_pose_of[25] = {0, 0, 0, 0, 3, 1, 2, 3, 1, 2, 3, 1, 2, 0xff, 0xff, 0xff,
                                     0, 0, 0, 3, 1, 2, 3, 1, 2};
 static int rope_pose, rope_anim = 145;
@@ -264,7 +272,7 @@ static void shoot_before(char *self, char *p)
     crouch = st == ST_CROUCH || (ground && (held & B_DOWN));
     wall = st >= 9 && st <= 11;
     rope = on_rope(st);
-    ladder = st == ST_LADDER;
+    ladder = on_ladder(st);
     if (copy_pose)
         copy_pose--;
     shooting = !LOCK(p) && ((held & B_SHOT) || copy_pose) && (ground || in_air(st) || crouch || wall || rope || ladder);
@@ -365,14 +373,14 @@ static void shoot_after(char *p, int was)
             rope_pose = rope_pose_of[want];
             rope_anim = ANIM(p);
         }
-        want = !shooting ? -1 : aim == D_FWD ? rope_anim : ROPE_AIM_ANIM + 2 * rope_pose + (aim == D_DOWNDIAG);
-        if (want < 0 && ANIM(p) >= ROPE_AIM_ANIM)
+        want = !shooting ? -1 : aim == D_FWD ? rope_anim : ROPE_AIM(2 * rope_pose + (aim == D_DOWNDIAG));
+        if (want < 0 && IS_ROPE_AIM(ANIM(p)))
             want = rope_anim;
         if (want >= 0 && ANIM(p) != want)
             set_anim(p, want);
         return;
     }
-    if (st == ST_LADDER) {   /* aims: their bank B anims through X's anim call; forward / let go: X's ladder shot */
+    if (on_ladder(st)) {   /* aims: their bank B anims through X's anim call; forward / let go: X's ladder shot */
         int in_aim = ANIM(p) >= ANIM_LADDER_AIM && ANIM(p) < ANIM_LADDER_AIM + 4;
         want = shooting && aim != D_FWD ? ANIM_LADDER_AIM + ladder_index(aim) : in_aim ? ANIM_LADDER_SHOT : -1;
         if (want >= 0 && ANIM(p) != want)
@@ -538,6 +546,7 @@ static char *player_p, *player_t;
 char *axl_self, *axl_p;
 unsigned axl_frames;   /* X main calls (dna_watch: the player has stopped running) */
 static int shot_count;
+int axl_bullets;   /* test: Axl's bullets made so far (axl_test.c bullets) */
 #define COPY_FULL_ID 0x12  /* X's full charge shot id (written to its charge fields while charging) */
 
 /* X's shot spawner FUN_023d4a50(this = player class, kind 1, id, sub, P): thiscall, 4 stack args */
@@ -649,6 +658,7 @@ void axl_spawned(char *w, int kind, int id, int sub, char *owner)
     if (i == N_TRACK)
         return;
     track[i].w = w;
+    axl_bullets++;
     track[i].age = 0;
     track[i].dir = aim;
     track[i].id = id;
@@ -2117,7 +2127,7 @@ void axl_box(char *self)
         return;
     if (ANIM(p) == 204 && !BOX_PTR(p) && (b = X_BOX_INDEX[0]) != 0)   /* change pose frames: none -> frame 0's */
         BOX_PTR(p) = X_BOXES + 8 * b;
-    else if (ANIM(p) >= ROPE_AIM_ANIM && ANIM(p) < ROPE_AIM_ANIM + 8) {   /* rope aims: the hang frame's */
+    else if (IS_ROPE_AIM(ANIM(p))) {   /* rope aims: the hang frame's */
         if ((b = ROPE_BOX_INDEX[7]) != 0)
             BOX_PTR(p) = X_BOXES + 8 * b;
     } else if ((f == 244 || f == 245) && !BOX_PTR(p) && (b = X_BOX_INDEX[62]) != 0)   /* wall aims: the wall shot's */

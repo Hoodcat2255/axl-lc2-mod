@@ -92,7 +92,8 @@
  * boss-attack projectiles: none once a change ended), cd_shot cd_special cd_dash cd_giga (frames until that skill
  * of the changed boss is ready again, axl_skills.c; cd_shot = the attack motion's frames left), hud (the skill HUD's
  * buttons drawn this frame, bit = slot: 15 all four, 0 hidden; axl_hud.c), flash_dir (the direction of the last muzzle
- * flash turned to the aim, axl_x.c flash_turn: 0 forward, FLASH_DIRS - 1 one step up .. ; -1 none yet).
+ * flash turned to the aim, axl_x.c flash_turn: 0 forward, FLASH_DIRS - 1 one step up .. ; -1 none yet), bullets
+ * (Axl's own bullets made since the last 'mark', axl_x.c axl_spawned).
  * Log lines go to axl_lc2.log (always when the harness is active).
  * axl_pdump.bin records: 'AXLP', u32 frame, u32 this, u32 P (= *(this + 0xD4)), u32 phase (0 before X's state code,
  * 1 after), 0x100 bytes of this, 0x400 bytes of P.
@@ -159,7 +160,8 @@ enum { S_TRACE, S_NOLIFT, S_SHOW, S_MARK, S_UNCHANGE, S_GHOST, S_ENERGY, S_SURVE
 #define MAX_STEPS 8192   /* (moves_intro: about 8000 steps) */
 static step_t steps[MAX_STEPS];
 static float mark_x, mark_y, mark_top;   /* mark: the place then, the highest point (least y) since */
-static int mark_shots;
+static int mark_shots, mark_bullets;
+extern int axl_bullets;   /* axl_x.c: Axl's bullets made so far */
 static int trace_n;   /* trace N: frames still to log */
 static int step_new = 1;
 static char cur_label[48];   /* the last 'log' text (a death names it) */   /* the current step runs its first frame (goto: its path) */
@@ -352,7 +354,7 @@ static const char *const OPS[] = {"==", "!=", "<", ">", "<=", ">="};
 
 static const char *const NAMES[] = {"stage", "area", "state", "checkpoint", "lives", "hp", "anim", "free", "px", "py",
                                     "boss_alive", "boss_hp", "steps", "embedded", "dx", "dy", "rise", "shots", "dna_shots",
-                                    "cd_shot", "cd_special", "cd_dash", "cd_giga", "hud", "flash_dir"};
+                                    "cd_shot", "cd_special", "cd_dash", "cd_giga", "hud", "flash_dir", "bullets"};
 
 static int parse_cond(char **tok, int n, cond_t *c)
 {
@@ -753,6 +755,8 @@ static int value_of(const char *name, int *ok)
             extern int proj_made;
             return proj_made - mark_shots;
         }
+        if (!strcmp(name, "bullets"))   /* (from the last mark) */
+            return axl_bullets - mark_bullets;
         if (!strcmp(name, "embedded")) {   /* the terrain box meets walls on both sides or floor and ceiling */
             int b = proj_terrain(p) & 0xF;
             return (b & 3) == 3 || (b & 0xC) == 0xC;
@@ -1193,6 +1197,7 @@ static void seq_frame(void)
                 mark_x = *(volatile float *)(axl_p + 0x14);
                 mark_top = mark_y = *(volatile float *)(axl_p + 0x1C);
                 mark_shots = proj_made;
+                mark_bullets = axl_bullets;
             }
             break;
         case S_UNCHANGE: {

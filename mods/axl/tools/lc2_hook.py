@@ -45,6 +45,12 @@ for _i in range(4):
 FLAME_ANIM = 246
 for _i in range(_D.N_FLAMES):
     PC_SCRIPTS[FLAME_ANIM + _i] = ([(96, 0, 0, _D.FLAME_BASE + _i)], None)
+# 252..255 = the rope aims of poses 2 / 3 (bank B 70-73): their PS1 numbers ROPE_AIM_ANIM + 4.. (229..232) are the wall
+# aims and the Giga Crush pictures here (user report 2026-11-05: Axl vanished shooting up / down on a rope); axl_x.c
+# ROPE_AIM
+ROPE_AIM_HI = 252
+for _i in range(4):
+    PC_SCRIPTS[ROPE_AIM_HI + _i] = ([(96, 0, 0, 70 + _i)], None)
 # (the copy shot's pictures: axl_proj.c fx_table, not here - anims are a byte and 0-255 are taken)
 # 250 = Axl's air dash (axl_x.c hover_after; user report 2026-10-27): anim 16's dash frames without its standing start
 # (1, 3: X set his air anim back every frame after an air shot, the dash restarted on them)
