@@ -15,8 +15,8 @@
 
 #define AXL_DATA_FILE "axl_data.bin"
 #define AXL_DATA_MAGIC 0x444C5841u   /* "AXLD" */
-#define AXL_DATA_VERSION 1           /* + 1 at every layout change */
-#define AXL_DATA_SIZE 43968          /* sizeof(axl_data_t): the packer and the DLL agree on the layout */
+#define AXL_DATA_VERSION 2           /* + 1 at every layout change */
+#define AXL_DATA_SIZE 43976          /* sizeof(axl_data_t): the packer and the DLL agree on the layout */
 
 /* ---- the mod's own constants (the generated headers repeat them: a mismatch stops the packer) ---- */
 #define DNA_SEQ_MAX 96
@@ -24,6 +24,8 @@
 #define DNA_PAL_SLOT 400
 #define MENU_PAL_SLOT 410
 #define SHOT_DIRS 32
+#define FLASH_DIRS 8
+#define FLASH_NF 4
 #define GIGA_SPIN 8
 #define MENU_LEVELS 4
 #define MENU_PALS 5
@@ -85,6 +87,8 @@ typedef struct {
     /* axl_hud_looks.h (lc2_dna.py hud_header) */
     int hud_tex_index, hud_pat, giga_ball, giga_ball_n, giga_gather, giga_gather_n, giga_orb, giga_orb_n;
     unsigned short hud_pals[N_BOSSES][2 * HUD_LEVELS][16];
+    /* axl_dna_looks.h: the turned muzzle flash (lc2_dna.flash_looks) */
+    int flash_tex_index, flash_pat;
 } axl_data_t;
 
 _Static_assert(sizeof(axl_data_t) == AXL_DATA_SIZE, "axl_data_t layout changed: AXL_DATA_SIZE, AXL_DATA_VERSION");
@@ -165,6 +169,8 @@ int axl_data_load(void);   /* 1 = axl_data.bin read and checked */
 #define GIGA_ORB (axl_d.giga_orb)
 #define GIGA_ORB_N (axl_d.giga_orb_n)
 #define hud_pals (axl_d.hud_pals)
+#define FLASH_TEX_INDEX (axl_d.flash_tex_index)
+#define FLASH_PAT (axl_d.flash_pat)
 #endif
 
 #endif

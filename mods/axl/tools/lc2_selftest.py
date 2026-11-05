@@ -71,7 +71,8 @@ def built(fn):
         return
     arc = F.Arc(path)
     orig = F.Arc(F.orig_path(fn))
-    added = [(F.TEX_NAME % (18 + k), h) for k in range(1, 11) for h in (F.H_TEX, F.H_COF)]   # DNA looks, boss shots, skill HUD
+    added = [(F.TEX_NAME % (18 + k), h) for k in range(1, 12) for h in (F.H_TEX, F.H_COF)]   # DNA looks, boss shots, skill HUD,
+    # the turned muzzle flash
     check([(e['name'], e['hash']) for e in arc.entries if (e['name'], e['hash']) not in added] ==
           [(e['name'], e['hash']) for e in orig.entries], '%s: built entry list differs from shipped' % region)
     check(all(any((e['name'], e['hash']) == a for e in arc.entries) for a in added), '%s: DNA textures missing' % region)

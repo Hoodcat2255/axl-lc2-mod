@@ -405,36 +405,38 @@ def shot_tiles(arc, pat_name):
     return out
 
 
-def rotated(tile, deg):
-    """nearest-neighbour rotation (counter-clockwise on screen) of a 16 x 16 picture centred on the origin
-    -> 32 x 32 picture centred on the origin"""
+def rotated(tile, deg, n=32):
+    """nearest-neighbour rotation (counter-clockwise on screen) of a square picture centred on the origin (16 x 16:
+    the bullet) -> n x n picture centred on the origin"""
     a = np.radians(deg)
-    yy, xx = np.mgrid[0:32, 0:32]
-    u, v = xx + 0.5 - 16, yy + 0.5 - 16
-    sx = np.floor(u * np.cos(a) - v * np.sin(a) + 8).astype(int)
-    sy = np.floor(u * np.sin(a) + v * np.cos(a) + 8).astype(int)
-    ok = (sx >= 0) & (sx < 16) & (sy >= 0) & (sy < 16)
-    out = np.zeros((32, 32), np.uint8)
+    s = tile.shape[0]
+    yy, xx = np.mgrid[0:n, 0:n]
+    u, v = xx + 0.5 - n // 2, yy + 0.5 - n // 2
+    sx = np.floor(u * np.cos(a) - v * np.sin(a) + s // 2).astype(int)
+    sy = np.floor(u * np.sin(a) + v * np.cos(a) + s // 2).astype(int)
+    ok = (sx >= 0) & (sx < s) & (sy >= 0) & (sy < s)
+    out = np.zeros((n, n), np.uint8)
     out[ok] = tile[sy[ok], sx[ok]]
     return out
 
 
 def cut(img):
-    """32 x 32 picture (origin at its centre) -> (tiles, parts [(x, y)]) on the 16 px grid offset with the fewest
-    tiles"""
+    """square picture (origin at its centre; 32 x 32: the bullet) -> (tiles, parts [(x, y)]) on the 16 px grid offset
+    with the fewest tiles"""
+    n = img.shape[0]
     best = None
     for oy in range(16):
         for ox in range(16):
             tl, ps = [], []
-            for ty in range(-oy, 32, 16):
-                for tx in range(-ox, 32, 16):
+            for ty in range(-oy, n, 16):
+                for tx in range(-ox, n, 16):
                     t = np.zeros((16, 16), np.uint8)
                     y0, x0 = max(ty, 0), max(tx, 0)
-                    y1, x1 = min(ty + 16, 32), min(tx + 16, 32)
+                    y1, x1 = min(ty + 16, n), min(tx + 16, n)
                     t[y0 - ty:y1 - ty, x0 - tx:x1 - tx] = img[y0:y1, x0:x1]
                     if t.any():
                         tl.append(t)
-                        ps.append((tx - 16, ty - 16))
+                        ps.append((tx - n // 2, ty - n // 2))
             if best is None or len(tl) < len(best[0]):
                 best = (tl, ps)
     return best
@@ -1066,6 +1068,67 @@ def hud_header(slot, hud):
     open(os.path.join(F.GEN, 'axl_hud_looks.h'), 'w').write('\n'.join(L))
 
 
+# Axl's muzzle flash turned to the aim (user request 2026-11-04): X's flash (pool 6 id 2, anim 39 of the shot table:
+# PAT section 1 frames FLASH_SRC on com00's tiles, origin = the gun tip) is drawn forward only. Its frames turned in
+# FLASH_DIRS directions (the aims are 45-degree steps) go into their own texture and parts section: frame
+# FLASH_NF * d + i = FLASH_SRC[i] turned d * 360 / FLASH_DIRS degrees (as SHOT_DIRS: counter-clockwise on screen,
+# data facing left); axl_x.c flash_turn.
+FLASH_TEX = 18 + 11     # pl02_029
+FLASH_DIRS = 8
+FLASH_SRC = (0, 1, 2, 3)
+FLASH_BOX = 48          # the source pictures on a square centred on the origin (frame 3 reaches x -21)
+FLASH_OUT = 64          # turned: the radius of frame 3's far corner is about 26 px
+
+
+def flash_pictures(arc, pat_name):
+    """FLASH_SRC as FLASH_BOX square index images centred on the origin (com00's tiles, parts' flips applied)"""
+    tex = F.tex_image(arc.get('X6\\chr\\com\\com00_000', F.H_TEX))
+    secs = F.pat_sections(arc.get(pat_name, F.H_PAT))
+    out = []
+    for f in FLASH_SRC:
+        img = np.zeros((FLASH_BOX, FLASH_BOX), np.uint8)
+        for rec in secs[1][f]:
+            a, lo, x, y = struct.unpack('<BBbb', rec)
+            assert a & 0x3c == 0, (f, a)   # (palette layer 0, as the object's slot)
+            t = lo | (a & 3) << 8
+            tl = tex[16 * (t // 16):16 * (t // 16) + 16, 16 * (t % 16):16 * (t % 16) + 16]
+            tl = np.where(tl == F.TEX_PAD, 0, tl)
+            if a & 0x40:
+                tl = tl[:, ::-1]
+            if a & 0x80:
+                tl = tl[::-1]
+            dst = img[FLASH_BOX // 2 + y:FLASH_BOX // 2 + y + 16, FLASH_BOX // 2 + x:FLASH_BOX // 2 + x + 16]
+            dst[tl > 0] = tl[tl > 0]
+        out.append(img)
+    return out
+
+
+def flash_looks(arc, pat_name):
+    """the turned flash's texture (com00's list, the object's) and parts section: returns (texture index, section)"""
+    tiles, frames = [], []
+    for d in range(FLASH_DIRS):
+        for img in flash_pictures(arc, pat_name):
+            tl, ps = cut(rotated(img, d * 360 / FLASH_DIRS, FLASH_OUT))
+            frames.append([((len(tiles) + i) >> 8, (len(tiles) + i) & 0xff, x, y) for i, (x, y) in enumerate(ps)])
+            tiles += tl
+    assert len(tiles) <= 1024, len(tiles)
+    h = 16
+    while h < 16 * ((len(tiles) + 15) // 16):
+        h *= 2
+    assert h <= 1024, h      # (a 2048 px texture crashed the game when drawn, 2026-10-26)
+    tex = np.full((h, 256), F.TEX_PAD, np.uint8)
+    for i, t in enumerate(tiles):
+        tex[16 * (i // 16):16 * (i // 16) + 16, 16 * (i % 16):16 * (i % 16) + 16] = t
+    head = struct.pack('<4sIIII', b'TEX\0', 0x200080a1, 1 | 256 << 6 | h << 19, 0x00011201, 0x14)
+    secs = F.pat_sections(arc.get(pat_name, F.H_PAT))
+    secs.append([[struct.pack('<BBbb', *q) for q in fr] for fr in frames])
+    arc.put(pat_name, F.H_PAT, F.pat(secs))
+    ti = F.add_texture(arc, FX_CTEX, F.TEX_NAME % FLASH_TEX, head + tex.tobytes(), arc.get(F.TEX_NAME % 0, F.H_COF),
+                       len(frames), [0] * len(frames))
+    flash_looks.size = (len(tiles), h)
+    return ti, len(secs) - 1
+
+
 FEET = 22   # X's feet below its origin (feet_line)
 
 
@@ -1099,7 +1162,7 @@ def box_of(k):
     return dx, FEET - h, w, h
 
 
-def header(bosses, slots, fx_slot, menu_pals):
+def header(bosses, slots, fx_slot, menu_pals, flash_slot):
     L = ['/* generated by mods/axl/tools/lc2_dna.py: the DNA Change looks (pl02*.arc); do not edit */',
          '/* (dna_seq, dna_look_t: lc2/axl_data.h) */',
          '#define DNA_SEQ_MAX %d' % SEQ_MAX,
@@ -1137,6 +1200,9 @@ def header(bosses, slots, fx_slot, menu_pals):
           '#define FX_TEX_INDEX %d' % fx_slot[0], '#define FX_PAT %d' % fx_slot[1],
           "/* Axl's bullet turned in SHOT_DIRS directions: frame SHOT_BASE + SHOT_NFLY * d + i = X's shot frame 5 + i */",
           '#define SHOT_DIRS %d' % SHOT_DIRS, '#define SHOT_BASE %d' % SHOT_BASE, '#define SHOT_NFLY %d' % len(SHOT_FLY),
+          "/* Axl's muzzle flash turned in FLASH_DIRS directions (flash_looks): frame FLASH_NF * d + i = X's flash frame i */",
+          '#define FLASH_TEX_INDEX %d' % flash_slot[0], '#define FLASH_PAT %d' % flash_slot[1],
+          '#define FLASH_DIRS %d' % FLASH_DIRS, '#define FLASH_NF %d' % len(FLASH_SRC),
           "/* the DNA menu badges (frame ICON_BASE + i: 0 Axl, k boss k); badge i's palettes at slots MENU_PAL_SLOT +",
           " * MENU_PALS * i ..: MENU_LEVELS by depth (far dark .. near bright), then selected */",
           '#define ICON_BASE %d' % ICON_BASE, '#define MENU_PAL_SLOT %d' % MENU_PAL_SLOT,

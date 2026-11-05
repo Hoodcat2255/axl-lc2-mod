@@ -66,6 +66,7 @@ char *objs_find_id(int id);
 float objs_overhead_bottom(float x, float half_w, float top);   /* a press over a boss */
 int objs_solid_beside(float x0, float x1, float y0, float y1);   /* a solid at the player's side */
 void dna_press_hold(void);   /* axl_dna.c: before the game lists the solids (axl_hook.c) */
+void axl_flash_frame(void);   /* axl_x.c: the muzzle flashes turned to the aim (axl_hook.c flash_state_hook) */
 void __cdecl dna_press_task(char *task);
 char __fastcall dna_press_contact(void *ecx, void *edx, int i);   /* axl_dna.c: the press's contact flag (axl_hook.c) */   /* axl_dna.c: the press's offset, before layer 1 is set (axl_hook.c) */
 void axl_look_late(void);              /* axl_x.c: the changed look put on after the unit move pass */

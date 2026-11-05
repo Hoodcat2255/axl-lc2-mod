@@ -1,0 +1,76 @@
+# The muzzle flash turned to the aim (user request 2026-11-04): X's flash (pool 6 id 2) of each shot shows the
+# turned frames of its aim (axl_x.c flash_turn; flash_dir 0 forward, 7 diagonal up, 6 up, 1 diagonal down, 2 down:
+# 45-degree steps clockwise against the facing), facing right and left, on the ground and in the air. The log has a
+# 'flash w .. dir D frame F tex T pat P' line per picture; a snap per aim while the shots go on.
+all_weapons
+seq
+wait free == 1 9000
+god on
+ghost on
+idle 30
+log muzzle_forward
+hold X
+idle 24
+snap
+idle 12
+release
+expect flash_dir == 0 muzzle_forward
+idle 20
+log muzzle_up_diagonal
+hold X UP RIGHT
+idle 24
+snap
+idle 12
+release
+expect flash_dir == 7 muzzle_up_diagonal
+idle 20
+log muzzle_up
+hold X UP
+idle 24
+snap
+idle 12
+release
+expect flash_dir == 6 muzzle_up
+idle 20
+log muzzle_down_diagonal
+hold X DOWN RIGHT
+idle 24
+snap
+idle 12
+release
+expect flash_dir == 1 muzzle_down_diagonal
+idle 20
+log muzzle_down
+hold X DOWN
+idle 24
+snap
+idle 12
+release
+expect flash_dir == 2 muzzle_down
+idle 20
+log muzzle_left_up_diagonal
+press 4 LEFT
+idle 10
+hold X UP LEFT
+idle 24
+snap
+idle 12
+release
+expect flash_dir == 7 muzzle_left_up_diagonal
+idle 20
+log muzzle_left_forward
+hold X
+idle 24
+release
+expect flash_dir == 0 muzzle_left_forward
+idle 20
+log muzzle_air_down_diagonal
+press 6 Z
+hold Z X DOWN LEFT
+idle 20
+snap
+idle 6
+release
+expect flash_dir == 1 muzzle_air_down_diagonal
+idle 60
+end

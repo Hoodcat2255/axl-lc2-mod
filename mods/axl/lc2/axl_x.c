@@ -424,12 +424,17 @@ static void hover_before(char *p)
         hovering = 0;
         axl_sound(SND_DASH);   /* (our own move: X's code plays nothing for it - user report 2026-10-29) */
         adash_kick = STATE(p) == ST_WALL_KICK;
-        if (adash_kick)   /* (kicking, he faces the wall: the dash goes the other way) */
+        /* the held way, also out of a kick (user report 2026-11-04: the way still held into the wall, the dash went
+         * the other way); nothing held: the way he faces - kicking he faces the wall, so the way he kicks off */
+        if (HELD(p) & (B_RIGHT | B_LEFT))
+            adash_right = (HELD(p) & B_RIGHT) != 0;
+        else if (adash_kick)
             adash_right = !(FACING(p) & FACE_RIGHT);
         else
-            adash_right = (HELD(p) & B_RIGHT) ? 1 : (HELD(p) & B_LEFT) ? 0 : (FACING(p) & FACE_RIGHT) != 0;
+            adash_right = (FACING(p) & FACE_RIGHT) != 0;
         if (test_on)
-            test_log("air dash start state %d facing %s", STATE(p), (FACING(p) & FACE_RIGHT) ? "right" : "left");
+            test_log("air dash start state %d facing %s held %04X c2 %04X c6 %04X -> %s", STATE(p), (FACING(p) & FACE_RIGHT) ? "right" : "left",
+                     HELD(p), O16(p, 0xC2), O16(p, 0xC6), adash_right ? "right" : "left");
     }
     if (adash_t) {
         adash_t--;
@@ -566,12 +571,19 @@ static void spawn_shot(char *self, char *p, int id, float x, float y, s32 vx, s3
 
 static char *fx_seen[16];
 static int fx_age[16];
+static int flash_due = -1;   /* the aim of Axl's bullet just made: its set-up makes its flash next (-1 none) */
+static void flash_note(char *o, int dir);
 
 void axl_allocated(char *o, int pool, int a, int b)
 {
     int i;
     objs_alloc(o, pool, a, b);
     proj_allocated(o, pool, a, b);
+    if (pool == 6 && a == 2 && b == 16 && flash_due >= 0 && player_p && !dna_boss)   /* X's muzzle flash, made by
+        * the set-up of the bullet axl_spawned just saw (a boss attack's is not one: axl_proj.c frees its flash) */
+        flash_note(o, flash_due);
+    if (pool == 6)
+        flash_due = -1;
     if (!log_fx || pool != 6)
         return;
     test_log("alloc pool %d a %d b %d -> %p", pool, a, b, o);
@@ -612,7 +624,7 @@ void axl_dash_cancel(char *p)
     O32(p, 0x3C) = 0;   /* (vx) */
 }
 
-/* axl_proj.c setup_hook: X's shot w has just been set up (its first update) */
+/* axl_proj.c setup_hook: X's shot w has just been set up (its first update, after X main: it makes the flash) */
 void axl_shot_setup(char *w)
 {
     int i;
@@ -651,6 +663,7 @@ void axl_spawned(char *w, int kind, int id, int sub, char *owner)
         W_Y(w) = spawn_fixed.y;
         FACING(w) = spawn_fixed.vx >= 0 ? FACE_RIGHT : 0;
     }
+    flash_due = spawn_fixed.on ? -1 : aim;   /* (fixed shots do not start at the gun) */
     track[i].vx = spawn_fixed.vx;
     track[i].vy = spawn_fixed.vy;
     track[i].x = spawn_fixed.x;
@@ -723,20 +736,127 @@ static void bullet_turn(char *w, float deg)
     O8(w, 0x66) = dir_script[k][idx].frame;
 }
 
+/* The muzzle flash turned to the aim (user request 2026-11-04): X's flash (pool 6, id 2) plays anim FLASH_ANIM of the
+ * same shot table (frames 0-3 of PAT section 1 on com00, X's forward) where the hand table puts it (the gun tip,
+ * hand_table). The build adds those frames turned in FLASH_DIRS directions as their own texture / parts section
+ * (lc2_dna.flash_looks); a flash X's shot code makes for Axl takes a copy of the table whose anim FLASH_ANIM shows
+ * them in its shot's aim, as bullet_turn does. Its place stays X's. Turned against the facing: the source faces left
+ * and is mirrored for facing right, so the aim's angle above forward turns it clockwise either way. */
+#define FLASH_ANIM 39
+#define N_FLASH 4
+static void *flash_table[FLASH_DIRS][SHOT_TABLE_N];
+static ent_t flash_script[FLASH_DIRS][SHOT_SCRIPT_MAX];
+static int flash_n;
+static char *flash_w[N_FLASH];
+static int flash_k[N_FLASH], flash_seen[N_FLASH];   /* (flash_seen: test, the frame logged) */
+static unsigned flash_t0[N_FLASH];                  /* frame_count when it was made */
+int axl_flash_dir = -1;   /* test: the direction of the last flash turned (axl_test.c flash_dir) */
+
+static void flash_init(void)
+{
+    const ent_t *src = (const ent_t *)SHOT_TABLE[FLASH_ANIM];
+    int d, i, n;
+
+    for (n = 0; n < SHOT_SCRIPT_MAX; n++)
+        if (src[n].step <= 0) {
+            n++;
+            break;
+        }
+    for (d = 0; d < FLASH_DIRS; d++) {
+        for (i = 0; i < SHOT_TABLE_N; i++)
+            flash_table[d][i] = SHOT_TABLE[i];
+        for (i = 0; i < n; i++) {
+            flash_script[d][i] = src[i];
+            if (src[i].frame < FLASH_NF)
+                flash_script[d][i].frame = (u8)(FLASH_NF * d + src[i].frame);
+        }
+        flash_table[d][FLASH_ANIM] = flash_script[d];
+    }
+    flash_n = n;
+    if (test_on)
+        test_log("flash direction scripts: %d entries, frames %d %d", n, src[0].frame, src[n - 1].frame);
+}
+
+static void flash_note(char *o, int dir)
+{
+    int i, rel = dir == D_UP ? 90 : dir == D_UPDIAG ? 45 : dir == D_DOWNDIAG ? -45 : dir == D_DOWN ? -90 : 0;
+
+    for (i = 0; i < N_FLASH && flash_w[i] && flash_w[i] != o; i++)
+        ;
+    if (i == N_FLASH)
+        return;
+    flash_w[i] = o;
+    flash_k[i] = ((-rel * FLASH_DIRS / 360) % FLASH_DIRS + FLASH_DIRS) % FLASH_DIRS;
+    flash_t0[i] = frame_count;
+    flash_seen[i] = -1;
+}
+
+/* 1 = w shows anim FLASH_ANIM turned to direction k (0 = not the flash's script: not set up yet, or another anim) */
+static int flash_turn(char *w, int k)
+{
+    const ent_t *cur = *(const ent_t *const *)(w + 0x50), *base;
+    int d, idx = -1;
+
+    if (!flash_n)
+        flash_init();
+    base = (const ent_t *)SHOT_TABLE[FLASH_ANIM];
+    if (cur >= base && cur < base + flash_n)
+        idx = (int)(cur - base);
+    for (d = 0; d < FLASH_DIRS && idx < 0; d++)
+        if (cur >= flash_script[d] && cur < flash_script[d] + flash_n)
+            idx = (int)(cur - flash_script[d]);
+    if (idx < 0)
+        return 0;
+    if (P_TABLE(w) == flash_table[k] && cur == &flash_script[k][idx])
+        return 1;
+    O32(w, 0x54) = FLASH_TEX_INDEX;
+    O32(w, 0x58) = FLASH_PAT;
+    P_TABLE(w) = flash_table[k];
+    *(const ent_t **)(w + 0x50) = &flash_script[k][idx];
+    O8(w, 0x66) = flash_script[k][idx].frame;
+    axl_flash_dir = k;
+    if (test_on)
+        test_log("flash w %p dir %d entry %d frame %d facing %02x", w, k, idx, O8(w, 0x66), O8(w, 0x29));
+    return 1;
+}
+
+/* every noted flash (its bullet's set-up makes it; its own first update sets its anim and draws it): turned while it
+ * lives - after the flash's state code, before its draw (axl_hook.c flash_state_hook), and in axl_frame */
+void axl_flash_frame(void)
+{
+    int i;
+    for (i = 0; i < N_FLASH; i++) {
+        char *w = flash_w[i];
+        if (!w)
+            continue;
+        if (!O8(w, 8) || O8(w, 9) != 2 || frame_count - flash_t0[i] > 16) {   /* (it lives 5 frames) */
+            flash_w[i] = 0;
+            continue;
+        }
+        if (!flash_turn(w, flash_k[i]))
+            continue;   /* (not set up yet: its first update sets its anim) */
+        if (test_on && flash_seen[i] != O8(w, 0x66)) {
+            flash_seen[i] = O8(w, 0x66);
+            test_log("flash w %p dir %d frame %d tex %d pat %d", w, flash_k[i], O8(w, 0x66), O32(w, 0x54), O32(w, 0x58));
+        }
+    }
+}
+
 /* Homing (user request 2026-10-26): a bullet bends toward the nearest enemy ahead, slightly: only one within
  * HOME_CONE degrees of its course and HOME_RANGE px, turning at most HOME_TURN degrees a frame and HOME_TOTAL in
  * all (2026-10-26: 50 / 2.5 bent too much, 15 / 0.8 / 12 too little; now 25 / 1.5 / 30) */
 #define HOME_RANGE 200
 #define HOME_CONE 25.0f
-#define HOME_TURN 1.0f    /* 2026-11-02 (user: bend less): 1.5 / 30, near 8 / 60 / 60 */
-#define HOME_TOTAL 20.0f
+#define HOME_TURN 0.7f    /* 2026-11-02 (user: bend less): 1.5 / 30, near 8 / 60 / 60; 2026-11-04 (still too
+                           * much): 1.0 / 20, near 45 / 5 / 40 */
+#define HOME_TOTAL 14.0f
 /* a target close to the bullet (user report 2026-10-29: a near enemy a little above / below was missed - outside the
  * cone, or 1.5 degrees a frame too slow to reach it before passing): within HOME_NEAR px the cone, the turn and the
  * total grow toward HOME_NEAR_CONE / _TURN / _TOTAL as it gets closer */
 #define HOME_NEAR 96.0f
-#define HOME_NEAR_CONE 45.0f
-#define HOME_NEAR_TURN 5.0f
-#define HOME_NEAR_TOTAL 40.0f
+#define HOME_NEAR_CONE 35.0f
+#define HOME_NEAR_TURN 2.5f
+#define HOME_NEAR_TOTAL 24.0f
 #define N_HOME 32
 static char *home[N_HOME];
 static float home_turned[N_HOME];   /* degrees turned so far */
@@ -1737,9 +1857,11 @@ void axl_frame(char *self, x_fn orig)
     player_t = on ? self : 0;
     axl_p = player_p;
     axl_self = player_t;
+    flash_due = -1;   /* (last frame's bullets were set up then) */
     bullets(p);
     if (on)
         homing(p);
+    axl_flash_frame();
     if (on && P_TABLE(p) == X_TABLE)
         P_TABLE(p) = axl_table;
     else if (!on && P_TABLE(p) == axl_table)

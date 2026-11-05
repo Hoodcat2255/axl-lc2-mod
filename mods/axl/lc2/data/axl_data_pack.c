@@ -118,6 +118,8 @@ int main(int argc, char **argv)
     d.giga_orb = GIGA_ORB;
     d.giga_orb_n = GIGA_ORB_N;
     SAME(hud_pals, hud_pals);
+    d.flash_tex_index = FLASH_TEX_INDEX;
+    d.flash_pat = FLASH_PAT;
 
     for (i = 16; i < sizeof d; i++)
         h = (h ^ p[i]) * 16777619u;

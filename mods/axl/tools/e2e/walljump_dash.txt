@@ -1,6 +1,7 @@
 # The air dash out of a wall kick (user report 2026-10-29 stream: holding the way into the wall, the dash after a
-# wall kick never came): it starts in the kick (state 10) and goes the way he kicks off, not back into the wall. The
-# intro stage wall of lc2_moves_gen.py (wall to the right).
+# wall kick never came): it starts in the kick (state 10) and goes the held way (user report 2026-11-04: still
+# holding the way into the wall, it went the other way), with nothing held the way he kicks off. The intro stage
+# wall of lc2_moves_gen.py (wall to the right).
 all_weapons
 seq
 wait free == 1 9000
@@ -15,7 +16,21 @@ mark
 press 3 Z RIGHT
 press 3 A Z RIGHT
 press 14 A RIGHT
-show dx dy anim
+show dx dy anim state
+expect dx > -10 walljump_dash_1560_held_wall
+release
+idle 60
+log walljump_dash_nothing_held
+goto 1560 1105 4
+idle 30
+press 12 Z RIGHT
+press 8 RIGHT
+mark
+press 3 Z RIGHT
+press 2 Z
+press 3 A Z
+press 14 A
+show dx dy anim state
 expect dx < -30 walljump_dash_1560_away
 release
 idle 60

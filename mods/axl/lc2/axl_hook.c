@@ -186,6 +186,17 @@ static void __fastcall solid_list_hook(void *map, void *edx)
     solid_list_orig(map, edx);
 }
 
+/* X's muzzle flash's task (0x02536540: its state code, then its draw 0x02535B50): the call of the state code goes
+ * through flash_state_hook, so a flash is turned to the aim before it is drawn - its first update, which sets its
+ * anim, draws it too (axl_x.c axl_flash_frame; user request 2026-11-04) */
+#define FLASH_STATE_CALL 0x02536543u   /* call 0x02536470 */
+#define FLASH_STATE 0x02536470u
+static void __fastcall flash_state_hook(char *task)
+{
+    ((x_fn)FLASH_STATE)(task);
+    axl_flash_frame();
+}
+
 /* the Metal Shark stage's press: at 0x024FC6AC (mov ecx, edi; mov eax, [esp + 0x14]) eax becomes its task, whose
  * offset (+ 0x6A) sets screen layer 1 right after - a stub calls dna_press_task(eax) there to read it (user request
  * 2026-11-02) */
@@ -430,6 +441,16 @@ static void install(void)
             patch(PRESS_CONTACT_SITE, call, 5);
         } else
             test_log("press: contact call site not as expected");
+    }
+    {   /* the muzzle flash's state code call */
+        unsigned char call[5];
+        call[0] = 0xE8;
+        put_rel(call + 1, FLASH_STATE_CALL + 5, (void *)FLASH_STATE);
+        if (expect(FLASH_STATE_CALL, call, 5)) {
+            put_rel(call + 1, FLASH_STATE_CALL + 5, (void *)flash_state_hook);
+            patch(FLASH_STATE_CALL, call, 5);
+        } else
+            test_log("muzzle flash: state call site not as expected");
     }
     {   /* the solids' terrain list: where a press meets a changed boss */
         static const unsigned char list_entry[5] = {0x51, 0x53, 0x55, 0x33, 0xC0};

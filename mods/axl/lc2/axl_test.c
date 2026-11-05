@@ -91,7 +91,8 @@
  * last 'mark': moved right / down in px, the highest point above the mark, our projectiles made), dna_shots (live
  * boss-attack projectiles: none once a change ended), cd_shot cd_special cd_dash cd_giga (frames until that skill
  * of the changed boss is ready again, axl_skills.c; cd_shot = the attack motion's frames left), hud (the skill HUD's
- * buttons drawn this frame, bit = slot: 15 all four, 0 hidden; axl_hud.c).
+ * buttons drawn this frame, bit = slot: 15 all four, 0 hidden; axl_hud.c), flash_dir (the direction of the last muzzle
+ * flash turned to the aim, axl_x.c flash_turn: 0 forward, FLASH_DIRS - 1 one step up .. ; -1 none yet).
  * Log lines go to axl_lc2.log (always when the harness is active).
  * axl_pdump.bin records: 'AXLP', u32 frame, u32 this, u32 P (= *(this + 0xD4)), u32 phase (0 before X's state code,
  * 1 after), 0x100 bytes of this, 0x400 bytes of P.
@@ -351,7 +352,7 @@ static const char *const OPS[] = {"==", "!=", "<", ">", "<=", ">="};
 
 static const char *const NAMES[] = {"stage", "area", "state", "checkpoint", "lives", "hp", "anim", "free", "px", "py",
                                     "boss_alive", "boss_hp", "steps", "embedded", "dx", "dy", "rise", "shots", "dna_shots",
-                                    "cd_shot", "cd_special", "cd_dash", "cd_giga", "hud"};
+                                    "cd_shot", "cd_special", "cd_dash", "cd_giga", "hud", "flash_dir"};
 
 static int parse_cond(char **tok, int n, cond_t *c)
 {
@@ -702,6 +703,10 @@ static int value_of(const char *name, int *ok)
     if (!strcmp(name, "hud")) {   /* the skill HUD's buttons drawn now, bit = slot (axl_hud.c) */
         extern int hud_shown;
         return hud_shown;
+    }
+    if (!strcmp(name, "flash_dir")) {   /* the direction of the last muzzle flash turned (axl_x.c flash_turn), -1 none */
+        extern int axl_flash_dir;
+        return axl_flash_dir;
     }
     if (!strncmp(name, "cd_", 3)) {   /* a skill slot's frames until ready (axl_skills.c; 0 = SK_SHOT .. 3 = SK_GIGA) */
         int skill_left(int s);

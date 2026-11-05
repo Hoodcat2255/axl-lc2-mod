@@ -704,6 +704,7 @@ def main(axl_dat=F.DAT['axl'], out=F.BUILT):
         slots = lc2_dna.dna_looks(arc, pat_name, bosses)   # DNA Change: the bosses' looks (textures 19-26, ...)
         fx_slot = lc2_dna.fx_looks(arc, pat_name, fx)       # and their projectiles (texture 27, PAT section 40)
         hud_slot = lc2_dna.hud_looks(arc, pat_name, hud)    # the skill HUD (texture 28, PAT sections 41-48)
+        flash_slot = lc2_dna.flash_looks(arc, pat_name)    # the muzzle flash turned (texture 29, PAT section 49)
         if os.environ.get('AXL_LC2_SPIKE'):   # feasibility: one more texture (copy of 000) and PAT section 32 (of 0)
             tex0, cof0 = arc.get(F.TEX_NAME % 0, F.H_TEX), arc.get(F.TEX_NAME % 0, F.H_COF)
             px = np.frombuffer(tex0[20:], np.uint8).copy()
@@ -722,7 +723,7 @@ def main(axl_dat=F.DAT['axl'], out=F.BUILT):
         print('wrote %s (%d bytes); com00 shot tiles from Axl: %d (%s-%s); DNA looks %s; X8 sounds %d' % (
             path, os.path.getsize(path), len(tiles), min(tiles), max(tiles), slots[0], n_sounds))
     _, menu_pals = lc2_dna.menu_icons(F.Arc(F.orig_path('pl02_eng.arc')), bosses)
-    lc2_dna.header(bosses, slots, fx_slot, menu_pals)
+    lc2_dna.header(bosses, slots, fx_slot, menu_pals, flash_slot)
     lc2_dna.hud_header(hud_slot, hud)
     build_kao(out)
     build_stsel(out)
