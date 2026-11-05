@@ -50,8 +50,15 @@ This is a test build: please report what looks or plays wrong.
 
 ## Tested on
 
-Linux (Steam / Proton) and Windows (test3, 2026-10-29). If the game crashes on Windows, first check that the
-unmodded game runs there (Steam "Verify integrity of game files", no `dinput8.dll`).
+Linux (Steam / Proton) and Windows (test3, 2026-10-29; test5 on Windows 11, 2026-11-05).
+
+## Windows: if it does not start
+
+- **The game closes when you pick X6** (even unmodded): since the game's update of 2026-03 its movies are WebM (VP9).
+  Install "VP9 Video Extensions" (and "Web Media Extensions") from the Microsoft Store, then restart Windows.
+- **Windows 11 blocks `dinput8.dll`** (Smart App Control: the DLL is not code-signed): Windows Security > App &
+  browser control > Smart App Control settings > Off. Recent Windows updates let you turn it back on later.
+- Otherwise check that the unmodded game runs (Steam "Verify integrity of game files", no `dinput8.dll`).
 
 ## Uninstall
 
@@ -81,8 +88,12 @@ What changed: PATCHNOTES.md (Korean).
 - 설치: 위 아카이브 5개를 백업하고(스팀 "게임 파일 무결성 확인"으로도 복원됨), 이 폴더 내용을 게임 폴더에
   구조 그대로 복사합니다. 리눅스·스팀덱은 실행 옵션에 `WINEDLLOVERRIDES="dinput8=n,b" %command%`.
 - 제거: `dinput8.dll`과 `axl_data.bin`을 지우고 스팀 "게임 파일 무결성 확인".
-- 리눅스(Proton)와 윈도우(test3)에서 실행을 확인했습니다. 윈도우에서 튕기면 먼저 원본 게임(무결성 확인, dll 없음)이
-  실행되는지 확인해 주세요.
+- 리눅스(Proton)와 윈도우(test3, test5는 윈도우 11)에서 실행을 확인했습니다.
+- 윈도우에서 X6를 고르면 바로 꺼질 때(원본 게임도): 2026-03 업데이트부터 게임 영상이 WebM(VP9)입니다. Microsoft Store에서
+  "VP9 Video Extensions"(와 "Web Media Extensions")를 설치하고 재부팅하세요.
+- 윈도우 11이 `dinput8.dll`을 막을 때(스마트 앱 컨트롤, 서명 없는 DLL): Windows 보안 > 앱 및 브라우저 컨트롤 >
+  스마트 앱 컨트롤 설정 > 끄기. 최근 업데이트된 윈도우는 나중에 다시 켤 수 있습니다.
+- 그래도 튕기면 원본 게임(무결성 확인, dll 없음)이 실행되는지 확인해 주세요.
 - 조작: 사격 연사·8방향 조준, 공중 점프 = 호버, 공중 대시, 땅에서 R = 구르기(구르는 동안 무적),
   기본 총에서 특수 버튼 차지 후 떼면 카피샷, 보스 무기를 고르고 특수 버튼 = DNA 변신
   (변신 중 사격 = 보스 공격, 대시 = 이동기, 특수 버튼 = 둘째 공격, R = 변신 해제,

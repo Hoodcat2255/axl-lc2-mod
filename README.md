@@ -124,11 +124,21 @@ Giga attacks. The DLL's version (its VERSIONINFO resource, `mods/axl/lc2/axl_ver
 - `mods/axl/work/sheet/`, `mods/axl/work/face/` - the mod's own edit data (sheet cuts, placements, animation edits,
   portrait layout); everything else under `work/` is build output.
 
+## Windows: if the game does not start
+
+- The game closes when you pick X6 (even unmodded): since the game's update of 2026-03 its movies are WebM (VP9).
+  Install "VP9 Video Extensions" (and "Web Media Extensions") from the Microsoft Store, then restart Windows.
+- Windows 11 blocks `dinput8.dll`: Smart App Control blocks unsigned code and has no per-app exception. Windows
+  Security > App & browser control > Smart App Control settings > Off (recent Windows updates let you turn it back
+  on). The DLL is not code-signed yet (see "Code signing policy").
+
 ## 한국어 요약
 
 - 레거시 컬렉션 2(스팀)의 X6에서 노멀 엑스를 액셀로 바꾸는 팬 모드의 소스입니다. 게임 데이터는 들어 있지 않고,
   빌드가 사용자 자신의 게임(레거시 컬렉션 2, PS1 록맨 X6 북미 v1.1 이미지)과 따로 받은 스프라이트 시트에서 만듭니다.
 - 준비: 위 "What you need"와 "Setup", 빌드: "Build". 배포본은 `lc2_dist.py 버전 --xdelta --no-skills`.
+- 윈도우에서 X6를 고르면 바로 꺼지면 Microsoft Store에서 "VP9 Video Extensions"를 설치하세요(2026-03 업데이트부터 영상이 WebM).
+  윈도우 11 스마트 앱 컨트롤이 서명 없는 `dinput8.dll`을 막으면: Windows 보안 > 앱 및 브라우저 컨트롤 > 스마트 앱 컨트롤 설정 > 끄기.
 - DLL은 게임 데이터 없이 이 저장소만으로 빌드됩니다(GitHub Actions). 게임에서 뽑은 표는 빌드가 `axl_data.bin`으로
   만들고, DLL이 시작할 때 자기 옆의 이 파일을 읽습니다. 파일이 없거나 맞지 않으면 아무것도 바꾸지 않습니다.
 
