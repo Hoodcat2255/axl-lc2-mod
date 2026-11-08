@@ -1404,7 +1404,43 @@ void __fastcall axl_boss_hp_set(char *comp, void *edx, int v)
 #define PUFF_N 9
 #define PUFF_STEP 3       /* frames per picture */
 #define PUFF_EVERY 7      /* frames between two puffs */
-#define PUFF_SLOT 7       /* + its pictures' palette bit 1: the stages' shared slot 8 (pale white-yellow, the same in every stage) */
+#define PUFF_SLOT 7       /* (no slot of our own: the stages' slot 8, its pictures' palette bit 1 added) */
+/* The puff's own palette (user report 2026-11-09: the smoke came out yellow, and in other colours with other bosses):
+ * its pictures use colours 10-14 of the slot their palette bit picks (1: W+0x5E + 1). The stages' slot 8 has
+ * pale yellows there (13 (30,30,22) and 14 (29,29,16), most of the puff) and the game puts other colours in it for
+ * some fights; these greys go to a free CLUT slot while a puff is out (as the hover jets', the giga's). */
+static const unsigned short puff_pal[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                            0xC610, 0xB16B, 0xFFFF, 0xEF7B, 0xE2F7, 0};   /* (bit 15 as the game's) */
+typedef void(__fastcall *puff_clut_up_t)(void *owner, void *edx, int slot, const void *src, int n);
+#define PUFF_CLUT_UP ((puff_clut_up_t)0x023AAEF0)   /* (CLUT_UP below) */
+#define PUFF_CLUT_OWNER (*(void **)0x041D8C44)
+static int puff_slot = -1;           /* our slot while puffs are out */
+static unsigned short puff_orig[16];
+static unsigned puff_seen;           /* frame_count of the last puff drawn */
+
+static void puff_palette(void)   /* every frame: the slot taken while a puff is out, given back 2 frames after */
+{
+    unsigned short *mem = PUFF_CLUT_OWNER ? (unsigned short *)((char *)PUFF_CLUT_OWNER + 0x1002C) : 0;
+    int on = puff_seen && frame_count - puff_seen <= 2;
+
+    if (!mem)
+        return;
+    if (on && puff_slot < 0) {
+        puff_slot = clut_free_run(1, dna_pal_slot, dna_pal_slot + 4);
+        if (puff_slot < 0)
+            return;   /* (none free: the stages' slot 8, PUFF_SLOT) */
+        memcpy(puff_orig, mem + 16 * puff_slot, sizeof puff_orig);
+        if (test_on)
+            test_log("puff palette at slot %d", puff_slot);
+    }
+    if (on)
+        PUFF_CLUT_UP(PUFF_CLUT_OWNER, 0, puff_slot, puff_pal, 1);
+    else if (puff_slot >= 0) {
+        PUFF_CLUT_UP(PUFF_CLUT_OWNER, 0, puff_slot, puff_orig, 1);
+        puff_slot = -1;
+    }
+}
+
 static void puff_fn(char *w, proj *q)
 {
     int f = q->t / PUFF_STEP;
@@ -1413,7 +1449,8 @@ static void puff_fn(char *w, proj *q)
         return;
     }
     proj_pose_look(w, PUFF_TEX, PUFF_PAT, PUFF_F0 + f);
-    O16(w, 0x5E) = PUFF_SLOT;
+    puff_seen = frame_count;
+    O16(w, 0x5E) = (unsigned short)(puff_slot > 0 ? puff_slot - 1 : PUFF_SLOT);
     O8(w, 0x2A) = LAYER_FRONT_;
     if (test_on && q->t == 4) {
         static int n;
@@ -1427,11 +1464,21 @@ static void puff_fn(char *w, proj *q)
 static void groggy_tick(char *b, int hp)
 {
     static unsigned last;
+    static char *prev_b;
+    static int prev_hp, down;   /* down: b came down to 1 from more (not its bar filling up at the fight's start) */
     const signed char *box;
     float x, y, w, h;
     char *pw;
 
-    if (!b || hp != 1 || (b != hold_boss && !hold_target(b)) || frame_count - last < PUFF_EVERY)
+    if (b != prev_b)
+        prev_hp = down = 0;
+    if (hp != 1)
+        down = 0;
+    else if (prev_hp > 1)
+        down = 1;   /* (the fight's start fills the hit points 0, 1, 2 ..: a puff at 1 there, user report 2026-11-09) */
+    prev_b = b;
+    prev_hp = hp;
+    if (!b || hp != 1 || (b != hold_boss && !(down && hold_target(b))) || frame_count - last < PUFF_EVERY)
         return;   /* (at 1 hit point, held or come down to it: user report 2026-11-08, Yammark at 1 showed none) */
     last = frame_count;
     box = *(const signed char *const *)(b + 0x7C);
@@ -1443,6 +1490,8 @@ static void groggy_tick(char *b, int hp)
         x -= w;
     x += (float)giga_rand((int)w + 1);
     y += (float)giga_rand((int)(h * 0.6f) + 1);
+    puff_seen = frame_count;
+    puff_palette();   /* (the slot before the first picture) */
     pw = proj_spawn(0, x, y, 0, -0x6000, 1, PUFF_N * PUFF_STEP + 2, puff_fn, P_PIERCE | P_WALL | P_NOSCREEN);
     if (pw) {
         proj_nobox(pw);
@@ -1463,9 +1512,11 @@ static void dna_watch_copy(char *p)
         copy_seen = 0;
         copy_gone = axl_frames;
     }
+    puff_palette();
     if (!st || !b) {
         boss = 0;
         hold_boss = 0;
+        groggy_tick(0, 0);   /* (no boss: its "came down to 1" forgotten) */
         return;
     }
     hp = *(volatile unsigned char *)(b + 0x84);   /* (the hit points; + 0x85 is the bar's fill, 2026-10-28 log) */
