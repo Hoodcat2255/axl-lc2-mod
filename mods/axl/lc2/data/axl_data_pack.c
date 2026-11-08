@@ -48,6 +48,7 @@ int main(int argc, char **argv)
     PUT(ents, axl_ents);
     /* axl_pal.h */
     SAME(axl_body_pal, axl_body_pal);
+    SAME(oneup_pal, oneup_pal);
     /* axl_gen.h */
     SAME(box_from, box_from);
     SAME(white_pal, white_pal);

@@ -1,0 +1,11 @@
+# (probe, 2026-11-08) the items' objects: the bot shoots through the intro under god; axl_items.c logs every object
+# drawing parts section 3 (pool, header, palette, frame, anim) to find the items' pool and ids
+seq
+wait free == 1 9000
+god on
+bot right
+idle 2400
+snap
+idle 2400
+snap
+end

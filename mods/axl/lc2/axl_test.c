@@ -17,6 +17,14 @@
  *                        (scripts keep their play-time frames however long the opening took)
  *   strscan F            at frame F log every distinct "X6\\..." resource name in memory (not sounds)
  *   animlog F1 F2        from F1 to F2 log the player's state, anim, anim cursor, frame and parts section every X main call
+ *   holdany              the boss hold (the copy shot's chance at 1 hit point, axl_x.c) on the intro's boss too
+ *   nzids ID...          the guard-break bullets near Nightmare Zero carry these damage ids (hex), one bullet each
+ *                        in turn, logged ('nz: bullet .. carries id'); his state / anim / hit points logged at each
+ *                        change (axl_items.c: which id makes him flinch)
+ *   itemkind K...        every dropped item (header 2f) gets item kind K (W+0xA, hex; several: one each in turn, the
+ *                        last kept) and runs its set-up again (W+0xC = 0): the real item of that kind (axl_items.c)
+ *   item1up              every item object (tex 0, parts section 3) turned to the 1UP's anim (its table's anim
+ *                        starting on frame 96): the 1UP picture and palette slot without finding a 1UP (axl_items.c)
  *   guard_all            every bullet is a guard-break bullet (axl_x.c)
  *   etable F VA          from frame F every live enemy uses the damage table at VA (hex; PS1 table copies 0x031DE8F8 +)
  *   hpwatch F            from frame F log every change of an enemy's damage table / hit points (axl_objs.c)
@@ -79,6 +87,7 @@
  *                        2-byte write watch on the first ecx + OFF; with POOL I only the task whose work (+0xC0)
  *                        is that remembered object; 'xwatch ADDR OFF eax' uses eax instead of ecx
  *   owatch POOL I OFF    write watch (DR0) on the I-th remembered object of POOL + OFF (hex)
+ *   bwatch OFF           write watch (DR0) on the live boss + OFF (hex): each writer EIP logged once
  *   gwatch PTR OFF       write watch (DR0) on *PTR + OFF (hex): each writer EIP logged once
  *   gdump PTR LEN [OFF]  one log line: LEN bytes (decimal, up to 2048) at *PTR + OFF (PTR, OFF hex)
  *   end                  'e2e end pass P fail F', the process ends 60 frames later (the last snap grabbed)
@@ -156,7 +165,7 @@ typedef struct {
     unsigned char vk[8];
     char text[48];
 } step_t;
-enum { S_TRACE, S_NOLIFT, S_SHOW, S_MARK, S_UNCHANGE, S_GHOST, S_ENERGY, S_SURVEY, S_BSET, S_GOTO, S_WAIT, S_EXPECT, S_PRESS, S_IDLE, S_TALK, S_HOLD, S_RELEASE, S_SET, S_PSET, S_GOD, S_BOT, S_SNAP, S_LOG, S_OBJS, S_GDUMP, S_GWATCH, S_OWATCH, S_XWATCH, S_END };
+enum { S_TRACE, S_NOLIFT, S_SHOW, S_MARK, S_UNCHANGE, S_GHOST, S_ENERGY, S_SURVEY, S_BSET, S_GOTO, S_WAIT, S_EXPECT, S_PRESS, S_IDLE, S_TALK, S_HOLD, S_RELEASE, S_SET, S_PSET, S_GOD, S_BOT, S_SNAP, S_LOG, S_OBJS, S_GDUMP, S_GWATCH, S_BWATCH, S_OWATCH, S_XWATCH, S_END };
 #define MAX_STEPS 8192   /* (moves_intro: about 8000 steps) */
 static step_t steps[MAX_STEPS];
 static float mark_x, mark_y, mark_top;   /* mark: the place then, the highest point (least y) since */
@@ -354,7 +363,7 @@ static const char *const OPS[] = {"==", "!=", "<", ">", "<=", ">="};
 
 static const char *const NAMES[] = {"stage", "area", "state", "checkpoint", "lives", "hp", "anim", "free", "px", "py",
                                     "boss_alive", "boss_hp", "steps", "embedded", "dx", "dy", "rise", "shots", "dna_shots",
-                                    "cd_shot", "cd_special", "cd_dash", "cd_giga", "hud", "flash_dir", "bullets"};
+                                    "cd_shot", "cd_special", "cd_dash", "cd_giga", "hud", "flash_dir", "bullets", "flash_off"};
 
 static int parse_cond(char **tok, int n, cond_t *c)
 {
@@ -485,6 +494,9 @@ static void parse_step(char **tok, int n)
         t->off = (int)strtoul(tok[1], NULL, 16);
         t->n = n >= 3 ? (int)strtoul(tok[2], NULL, 16) : -1;
         t->v = n == 5 ? atoi(tok[3]) * 1000 + atoi(tok[4]) : n == 4 && !strcmp(tok[3], "eax") ? -2 : -1;
+    } else if (!strcmp(tok[0], "bwatch") && n == 2) {   /* bwatch OFF: write watch on the live boss + OFF */
+        t->op = S_BWATCH;
+        t->n = (int)strtoul(tok[1], NULL, 16);
     } else if (!strcmp(tok[0], "gwatch") && n == 3) {   /* gwatch PTR OFF: write watch on *PTR + OFF */
         t->op = S_GWATCH;
         t->off = (int)strtoul(tok[1], NULL, 16);
@@ -652,7 +664,24 @@ void test_init(void)
             animlog_f2 = atoi(tok[2]);
         } else if (n == 2 && !strcmp(tok[0], "skipto"))
             skipto_f = atoi(tok[1]);
-        else if (n == 1 && !strcmp(tok[0], "guard_all")) {
+        else if (n == 1 && !strcmp(tok[0], "holdany")) {   /* the boss hold on the intro's boss too (axl_x.c) */
+            extern int axl_hold_any;
+            axl_hold_any = 1;
+        } else if (n >= 2 && !strcmp(tok[0], "nzids")) {   /* nzids ID...: guard-break bullets near Nightmare Zero carry
+                                                          * these ids (hex), one bullet each in turn (axl_proj.c) */
+            extern int proj_nz_ids[12], proj_nz_n;
+            int j;
+            for (j = 1; j < n && proj_nz_n < 12; j++)
+                proj_nz_ids[proj_nz_n++] = (int)strtoul(tok[j], NULL, 16);
+        } else if (n >= 2 && !strcmp(tok[0], "itemkind")) {   /* itemkind K...: dropped items made kind K (hex), in turn */
+            extern int items_kinds[8], items_n_kinds;
+            int j;
+            for (j = 1; j < n && items_n_kinds < 8; j++)
+                items_kinds[items_n_kinds++] = (int)strtoul(tok[j], NULL, 16);
+        } else if (n == 1 && !strcmp(tok[0], "item1up")) {   /* every dropped item plays the 1UP's anim (axl_items.c) */
+            extern int items_force_1up;
+            items_force_1up = 1;
+        } else if (n == 1 && !strcmp(tok[0], "guard_all")) {
             extern int axl_guard_test;
             axl_guard_test = 1;
         } else if (n == 3 && !strcmp(tok[0], "etable")) {
@@ -709,6 +738,10 @@ static int value_of(const char *name, int *ok)
     if (!strcmp(name, "flash_dir")) {   /* the direction of the last muzzle flash turned (axl_x.c flash_turn), -1 none */
         extern int axl_flash_dir;
         return axl_flash_dir;
+    }
+    if (!strcmp(name, "flash_off")) {   /* px between the last muzzle flash turned and its bullet's start, -1 none */
+        extern int axl_flash_off;
+        return axl_flash_off;
     }
     if (!strncmp(name, "cd_", 3)) {   /* a skill slot's frames until ready (axl_skills.c; 0 = SK_SHOT .. 3 = SK_GIGA) */
         int skill_left(int s);
@@ -1239,6 +1272,13 @@ static void seq_frame(void)
             void test_xwatch(void *addr, int then, void *work, int use_eax);
             char *objs_get(int pool, int i);
             test_xwatch((void *)(unsigned)t->off, t->n, t->v >= 0 ? objs_get(t->v / 1000, t->v % 1000) : 0, t->v == -2);
+            break;
+        }
+        case S_BWATCH: {
+            char *b = objs_boss();
+            test_log("e2e bwatch %p +%x%s", (void *)b, t->n, b ? "" : " (no boss)");
+            if (b)
+                test_watch(b + t->n);
             break;
         }
         case S_GWATCH:

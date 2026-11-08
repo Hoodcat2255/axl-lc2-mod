@@ -1,0 +1,50 @@
+# The Giga Crush in the air (user request 2026-11-07): the giga button in a jump starts it ("giga start in the
+# air"), Axl stays where he pressed it (dy about 0) in the giga pose (anim 245) until it ends, then falls and lands.
+# On the ground as before. Then the guard-break bullet (guard_all) still hurts the intro's first enemy (hpwatch).
+all_weapons
+guard_all
+hpwatch 1
+seq
+wait free == 1 9000
+god on
+ghost on
+goto 360 1080 4
+idle 40
+log giga_air
+pset 1A0 60
+pset 1A1 0
+press 10 Z
+mark
+press 2 V
+idle 20
+show dy anim state
+expect anim == 245 giga_air_pose
+expect dy < 3 giga_air_held_up
+expect dy > -3 giga_air_held_down
+idle 40
+snap
+show dy anim state
+expect anim == 245 giga_air_pose_late
+expect dy < 3 giga_air_still_up
+idle 60
+show dy anim state
+expect anim != 245 giga_air_over
+expect dy > 10 giga_air_fell
+log giga_ground
+goto 360 1080 4
+idle 40
+pset 1A0 60
+pset 1A1 0
+mark
+press 2 V
+idle 30
+show dy anim state
+expect anim == 245 giga_ground_pose
+idle 90
+expect anim != 245 giga_ground_over
+log guard_shots
+goto 360 1080 4
+idle 30
+press 120 X RIGHT
+idle 30
+end

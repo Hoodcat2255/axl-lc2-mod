@@ -349,6 +349,7 @@ static void __fastcall move_hook(void *self)
             last = now;
         }
     }
+    items_late();      /* (axl_items.c: the 1UP's own palette slot) */
     axl_look_late();   /* (axl_x.c: this frame's look, every unit moved) */
     hud_late(menu_state != 0);   /* (axl_hud.c: the skill HUD placed and shown, or hidden) */
 }

@@ -118,14 +118,62 @@ def hud_emblem(img):
 # The 1UP (user request 2026-10-27: the sheet's Axl 1UP instead of X's helmet): X draws it with type 3 section 3
 # frames 96-98 (the helmet turning) and 89-95 (the ball; 90-95 inside a ring of tiles 513-515 mirrored four ways),
 # 2-4 com00 tiles each, 18-23 px across. The sheet's 10 pictures (19-25 px) go in 1:1 (not shrunk: user 2026-10-27),
-# one per frame, centred on X's picture, onto empty com00 tiles from ONEUP_TILE0 (quantized to the player palette 0,
-# which these frames use).
+# one per frame, centred on X's picture, onto empty com00 tiles from ONEUP_TILE0. The game draws items with CLUT slot 11
+# of the stage palette (stage COL *_0x, the same 16 colours in all 46 stage archives; X's helmet matches a game capture
+# with it, user 2026-11-08), which the energy capsules share and which has no grey: Axl's pictures are quantized to
+# their own palette (oneup_own_pal: the sheet's 1UP colours, at most 15), which the DLL uploads to a free CLUT slot
+# and gives the 1UP object (axl_items.c; the palette reaches it through axl_data.bin oneup_pal, lc2_hook.py).
 ONEUP_CELLS = ((982, 234, 1001, 251), (1006, 234, 1025, 251), (1030, 234, 1049, 251), (1054, 231, 1078, 253),
                (1078, 231, 1102, 253), (1102, 231, 1127, 253), (1132, 232, 1153, 252), (1158, 233, 1178, 251),
                (1183, 232, 1204, 252), (1209, 231, 1232, 253))   # sheet (x0, y0, x1, y1): head turning into the ball
 ONEUP_FRAMES = (96, 97, 98, 89, 90, 91, 92, 93, 94, 95)
 ONEUP_SEC = 3
 ONEUP_TILE0 = 878   # com00 878-917 are empty (864-877: the rotated shots)
+ONEUP_STAGE, ONEUP_CLUT = 'st00_eng.arc', 11   # the item palette: stage COL *_0x slot 11
+# placement (user 2026-11-08: the item wobbled): each picture's drawn pixels (not its cell, whose margins differ) are
+# centred on X's picture of that frame, then moved by the viewer's per-frame nudge. work/sheet/oneup.json (the viewer's
+# 1UP tab "save") = {"cells": [[x0, y0, x1, y1] x 10, in ONEUP_FRAMES order], "nudge": {"<frame>": [dx, dy]}}
+ONEUP_JSON = os.path.join(HERE, '..', 'work', 'sheet', 'oneup.json')
+
+
+def oneup_edits():
+    """-> (cells, nudge {frame: (dx, dy)}) from ONEUP_JSON, else the defaults"""
+    if not os.path.exists(ONEUP_JSON):
+        return [tuple(c) for c in ONEUP_CELLS], {}
+    import json
+    d = json.load(open(ONEUP_JSON, encoding='utf-8'))
+    cells = [tuple(int(v) for v in c) for c in d.get('cells', ONEUP_CELLS)]
+    assert len(cells) == len(ONEUP_FRAMES) and all(x1 > x0 and y1 > y0 for x0, y0, x1, y1 in cells), \
+        'oneup.json: %d cells, need %d with x1 > x0, y1 > y0' % (len(cells), len(ONEUP_FRAMES))
+    nudge = {int(k): (int(v[0]), int(v[1])) for k, v in d.get('nudge', {}).items()}
+    return cells, nudge
+
+
+def oneup_own_pal():
+    """the 1UP's own palette as [16, 3] RGB (5-bit steps): 0 transparent, then the sheet 1UP cells' colours, most used
+    first (at most 15; more: the 15 most used, the rest drawn with the nearest)"""
+    from PIL import Image
+    sheet = np.array(Image.open(os.path.join(HERE, '..', 'work', 'sheet', 'axl_sheet.png')).convert('RGB')).astype(int)
+    count = {}
+    for x0, y0, x1, y1 in oneup_edits()[0]:
+        c = sheet[y0:y1, x0:x1].reshape(-1, 3)
+        for v in map(tuple, c[np.abs(c - SHEET_BG).sum(1) >= 12] >> 3 << 3):
+            count[v] = count.get(v, 0) + 1
+    cols = sorted(count, key=lambda v: (-count[v], v))[:15]
+    return np.array([(0, 0, 0)] + cols + [(0, 0, 0)] * (15 - len(cols)))
+
+
+def oneup_words():
+    """oneup_own_pal as 16 PS1 colour words (the DLL's oneup_pal)"""
+    return [int(r) >> 3 | (int(g) >> 3) << 5 | (int(b) >> 3) << 10 for r, g, b in oneup_own_pal()]
+
+
+def oneup_pal():
+    """X's 1UP colours as the game draws them (stage palette slot ONEUP_CLUT) as [16, 3] RGB (the viewer)"""
+    st = F.Arc(os.path.join(F.ROMPC, ONEUP_STAGE))
+    col = [e['name'] for e in st.entries if e['hash'] == F.H_COL and e['name'].endswith('_0x')][0]
+    words = struct.unpack_from('<16H', st.get(col, F.H_COL), 12 + 32 * ONEUP_CLUT)
+    return np.array([[(c & 31) << 3, (c >> 5 & 31) << 3, (c >> 10 & 31) << 3] for c in words])
 
 
 def oneup_box(parts, img):
@@ -145,20 +193,23 @@ def put_oneup(arc, pat_name):
     """the sheet's 1UP pictures onto com00 tiles ONEUP_TILE0.. and PAT section 3 frames ONEUP_FRAMES; -> tiles used"""
     from PIL import Image
     sheet = np.array(Image.open(os.path.join(HERE, '..', 'work', 'sheet', 'axl_sheet.png')).convert('RGB')).astype(int)
-    col = arc.get(F.COL_NAME, F.H_COL)
-    words = struct.unpack_from('<16H', col, 12)
-    pal = np.array([[(c & 31) << 3, (c >> 5 & 31) << 3, (c >> 10 & 31) << 3] for c in words])
+    pal = oneup_own_pal()
     tex = bytearray(arc.get(COM00, F.H_TEX))
     img = np.frombuffer(bytes(tex[20:]), np.uint8).reshape(-1, 256).copy()
     secs = F.pat_sections(arc.get(pat_name, F.H_PAT))
     t = ONEUP_TILE0
-    for (x0, y0, x1, y1), f in zip(ONEUP_CELLS, ONEUP_FRAMES):
+    cells, nudge = oneup_edits()
+    for (x0, y0, x1, y1), f in zip(cells, ONEUP_FRAMES):
         c = sheet[y0:y1, x0:x1]
-        h, w = c.shape[:2]
         pic = 1 + np.argmin(((c[:, :, None] - pal[None, None, 1:]) ** 2).sum(3), 2)
         pic[np.abs(c - SHEET_BG).sum(2) < 12] = 0
+        ys, xs = np.nonzero(pic)
+        assert len(ys), 'oneup cell %s (frame %d) is empty' % ((x0, y0, x1, y1), f)
+        pic = pic[ys.min():ys.max() + 1, xs.min():xs.max() + 1]   # the drawn pixels only
+        h, w = pic.shape
         bx0, by0, bx1, by1 = oneup_box(secs[ONEUP_SEC][f], img)
-        ox, oy = (bx0 + bx1 - w) // 2, (by0 + by1 - h) // 2     # picture top-left, frame coordinates
+        dx, dy = nudge.get(f, (0, 0))
+        ox, oy = (bx0 + bx1 - w) // 2 + dx, (by0 + by1 - h) // 2 + dy   # picture top-left, frame coordinates
         parts = []
         for ty in range(0, h, 16):
             for tx in range(0, w, 16):

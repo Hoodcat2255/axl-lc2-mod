@@ -21,6 +21,7 @@ __pycache__/
 !/mods/axl/work/sheet/victory.json
 !/mods/axl/work/sheet/white_map.json
 !/mods/axl/work/sheet/boss_edits.json
+!/mods/axl/work/sheet/oneup.json
 /mods/axl/work/face/*
 !/mods/axl/work/face/map4.json
 !/mods/axl/work/face/map5.json

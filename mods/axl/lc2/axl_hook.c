@@ -28,6 +28,7 @@
 #define X_MAIN_BOX     0x02539EB5u   /* tail jmp 0x025447A0 = hurt box (PS1 FUN_8003c3c8) */
 #define X_BOX          0x025447A0u
 #define MAKE_OBJECT    0x023B1160u   /* make object (kind, id, sub, owner, slot): entry hooked via a trampoline */
+#define BOSS_HP_SET_CALL 0x023CFCE0u   /* the damage routine (PS1 FUN_800315cc): call FUN_020a6490 (the new hit points) */
 #define KBD_READ       0x01E74FA0u   /* keyboard read (thiscall, 1 arg; GetAsyncKeyState x 256 when the DirectInput
                                         keyboard is null, as under Proton): once per input update = the harness's frame */
 
@@ -441,6 +442,16 @@ static void install(void)
             patch(PRESS_CONTACT_SITE, call, 5);
         } else
             test_log("press: contact call site not as expected");
+    }
+    {   /* the damage routine's hit points write (axl_x.c axl_boss_hp_set: the copy shot's chance) */
+        unsigned char call[5];
+        call[0] = 0xE8;
+        put_rel(call + 1, BOSS_HP_SET_CALL + 5, (void *)0x020A6490);
+        if (expect(BOSS_HP_SET_CALL, call, 5)) {
+            put_rel(call + 1, BOSS_HP_SET_CALL + 5, (void *)axl_boss_hp_set);
+            patch(BOSS_HP_SET_CALL, call, 5);
+        } else
+            test_log("boss hold: hit points call site not as expected");
     }
     {   /* the muzzle flash's state code call */
         unsigned char call[5];

@@ -56,6 +56,11 @@ void objs_alloc(char *o, int pool, int a, int b);
 void objs_dump(void);
 char *objs_table_near(float x, float y, int r, unsigned table);
 int objs_iframe_open(float x, float y, int r);
+extern int axl_pierce;                /* axl_x.c: Speed Shot worn, Axl's bullets pierce (axl_proj.c) */
+void proj_pierce_new(char *w);         /* axl_proj.c: a new plain bullet, Speed Shot worn */
+char *objs_hurt_obj_near(float x, float y, int r);
+int objs_guard_open(float x, float y, int r, int id);
+void objs_log_near(float x, float y, int r, int id);   /* test */   /* the guard-break bullet opens guards (axl_proj.c) */
 extern int objs_mute;
 int objs_muted(char *o);
 void objs_hp_frame(void);
@@ -93,6 +98,9 @@ int dna_leaving(void);                 /* axl_dna.c: the change's leaving blink 
 extern int axl_fly_fast;               /* axl_x.c: Yammark's fast flight (the dash button held) */
 /* axl_hud.c: the skill HUD (docs/skills_design.md) */
 void hud_frame(char *p);               /* X main: the buttons made while changed */
+void __fastcall axl_boss_hp_set(char *comp, void *edx, int v);   /* axl_x.c: the boss hold (axl_hook.c) */
+int dna_stage_boss_type(int stage);     /* axl_dna.c: stage 1-8's Maverick type, else 0 */
+void items_late(void);                /* axl_items.c: after the unit pass, the 1UP's palette slot */
 void hud_late(int menu_open);          /* after the unit pass: placed, shown / hidden */
 
 /* axl_menu.c: the DNA menu (L / R) */
@@ -134,9 +142,11 @@ int objs_targets(float x, float y, int rx, int ry, char **out, int max);   /* ax
 #define GUARD_STUN_ID 0x12        /* X's full charge: what stuns High Max */
 #define GUARD_SLOT 11             /* the guard-break bullet's palette slot (W+0x5E): X's charge blue */
 #define HIGHMAX_TABLE 0x031DF4D8u /* High Max's damage table (PC copy of PS1 0x8007523C, unstunned) */
-#define NZERO_TYPE 0x23           /* Nightmare Zero (object id, Yammark stage's blue pillar, hpwatch 2026-10-27) */
+#define NZERO_TYPE 0x23           /* Nightmare Zero (object id, Yammark stage's blue pillar, hpwatch 2026-10-27; 0x35 on
+                                   * the Mijinion stage, 2026-11-08: found by NZERO_TABLE, not by type) */
 #define NZERO_TABLE 0x031DF398u   /* his damage table (2 bytes per id: id 0x18 2, buster 1, ids 0x11 / 0x16 8) */
-#define GUARD_WEAK_ID 0x16        /* X's Nova Strike id: 8 on Nightmare Zero's table, his Z-saber weakness stand-in */
+#define GUARD_WEAK_ID 0x32        /* X's saber id (0x32): 5 on Nightmare Zero's table and his flinch (state 12, anim 8 - X
+                                   * with the Falcon armour, user 2026-11-08; 0x16 took 8, no flinch) */
 
 #define SND_YAM_SHOT 20
 #define SND_WOLF_THROW 21

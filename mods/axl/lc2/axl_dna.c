@@ -416,6 +416,11 @@ void dna_test_end(void)
  * the same in the stage fights and the rematches, assumed); hit points P+0x84 (PS1 +0x5C). */
 static const u8 weak_of[9] = {0, 8, 3, 5, 6, 1, 2, 4, 7};
 static const u8 boss_type[9] = {0, 0x31, 0x36, 0x34, 0x38, 0x32, 0x39, 0x33, 0x3A};
+
+int dna_stage_boss_type(int stage)   /* the Maverick of stage 1-8 (his object type), 0 other stages */
+{
+    return stage >= 1 && stage <= 8 ? boss_type[stage] : 0;
+}
 #define HP(p) O8(p, 0x84)
 static u8 last_hp;
 static int pose_air;     /* the change started in the air: Axl hangs there until the pose ends, then falls */

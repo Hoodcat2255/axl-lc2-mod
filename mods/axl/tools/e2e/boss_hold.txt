@@ -1,0 +1,28 @@
+# The copy shot's chance (user request 2026-11-08, axl_x.c axl_boss_hp_set): a boss hit for its last hit points by
+# anything but the copy shot keeps 1 for 300 frames (5 s), smoke puffs rising from it (groggy), then the hold ends and
+# the next hit ends it (its hit points 0; the body stays a while, intro_boss). holdany: the intro's D-1000 counts (stages 1-8 only in play). The bot shoots it under god.
+holdany
+seq
+wait free == 1 9000
+idle 30
+set 59 2
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+god on
+bot boss
+wait boss_hp > 20 2400
+wait boss_hp == 1 5400
+expect boss_alive == 1 held_at_1
+idle 60
+snap
+expect boss_hp == 1 still_1_after_1s
+idle 60
+snap
+idle 120
+expect boss_hp == 1 still_1_after_4s
+wait boss_hp == 0 1200
+expect boss_hp == 0 ends_after_the_hold
+bot off
+end

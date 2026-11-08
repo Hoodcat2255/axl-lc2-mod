@@ -1,0 +1,66 @@
+# The muzzle flash of a wall shot sits where its bullet starts (user report 2026-11-05: clinging to a wall and shooting
+# diagonally, the flash was somewhere else). On the intro stage wall at 1560 (wall to the right, lc2_moves_gen.py):
+# forward, up-diagonal and down-diagonal shots; flash_off = px between the last flash's place (its first picture) and
+# its bullet's start (Axl's place + the aim's gun tip, axl_x.c axl_flash_frame); the log has a 'flash place' line per
+# flash with Axl's anim / frame then.
+all_weapons
+seq
+wait free == 1 9000
+god on
+ghost on
+log wall_flash_forward
+goto 1560 1105 4
+idle 30
+press 12 Z RIGHT
+press 6 RIGHT
+hold X RIGHT
+idle 20
+snap
+idle 10
+show flash_off flash_dir anim p_66 state
+expect anim == 125 wall_flash_forward_pose
+expect flash_dir == 0 wall_flash_forward_dir
+expect flash_off <= 3 wall_flash_forward_at_tip
+release
+idle 60
+log wall_flash_up_diagonal
+goto 1560 1105 4
+idle 30
+press 12 Z RIGHT
+press 6 RIGHT
+hold X UP RIGHT
+idle 20
+snap
+idle 10
+show flash_off flash_dir anim p_66 state
+expect anim == 229 wall_flash_up_diagonal_pose
+expect flash_dir == 7 wall_flash_up_diagonal_dir
+expect flash_off <= 3 wall_flash_up_diagonal_at_tip
+release
+idle 60
+log wall_flash_down_diagonal
+goto 1560 1105 4
+idle 30
+press 12 Z RIGHT
+press 6 RIGHT
+hold X DOWN RIGHT
+idle 20
+snap
+idle 10
+show flash_off flash_dir anim p_66 state
+expect anim == 230 wall_flash_down_diagonal_pose
+expect flash_dir == 1 wall_flash_down_diagonal_dir
+expect flash_off <= 3 wall_flash_down_diagonal_at_tip
+release
+idle 60
+log wall_flash_first_up_diagonal
+goto 1560 1105 4
+idle 30
+press 12 Z RIGHT
+press 6 RIGHT
+press 3 X UP RIGHT
+show flash_off flash_dir anim p_66 state
+expect flash_off <= 3 wall_flash_first_up_diagonal_at_tip
+release
+idle 60
+end

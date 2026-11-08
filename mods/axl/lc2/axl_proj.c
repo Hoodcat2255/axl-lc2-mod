@@ -119,7 +119,7 @@ static void apply_look(proj *q)
         test_projlook(&proj_tex, &proj_pat, &proj_anim);
     fx_table_init();
     P_TABLE(w) = q->fx ? fx_table : axl_table;
-    O32(w, 0x54) = proj_tex >= 0 ? proj_tex : q->tex ? q->tex : FX_TEX_INDEX;
+    O32(w, 0x54) = proj_tex >= 0 ? proj_tex : q->tex ? (q->tex & 0xFF) : FX_TEX_INDEX;   /* (PROJ_TEX0: index 0) */
     O32(w, 0x58) = proj_pat >= 0 ? proj_pat : q->tex ? q->pat : FX_PAT;
     *(volatile unsigned short *)(w + 0x5E) = (unsigned short)dna_pal_slot;
     SET_ANIM(w, 0, w, proj_anim >= 0 ? proj_anim : q->anim);
@@ -336,6 +336,9 @@ static void __fastcall setup_hook(char *task)
     if (q->box)
         apply_box(q);
     apply_look(q);
+    if (q->nobox && !(q->flags & P_HIT1))   /* (no attack box from its first frame: X's shot's own would hit what it is made in - the boss
+                     * hold's smoke puffs were gone at once on the boss, 2026-11-08) */
+        *(void *volatile *)(w + 0x78) = 0;
     OWNER_COUNT(*(char **)(w + 0xC0))++;   /* X's fire code counts its shots; state 3 takes ours off again */
     if (test_on)
         test_log("proj set up w %p id %d xy %.1f %.1f v %x %x anim %d", w, q->id, q->x, q->y, q->vx, q->vy, q->anim);
@@ -437,6 +440,90 @@ int proj_terrain(char *w)
     return bits;
 }
 
+/* Speed Shot worn (axl_x.c axl_pierce): a plain bullet of Axl's that hit something (W+0xD4 > 0: an enemy took it)
+ * has the result cleared before X's flight reads it, so it flies on; a bounce (< 0) is left to X. Each enemy once:
+ * while the bullet is over an enemy it hit, its attack box (W+0x78) is off for the enemies' hit tests (taken off
+ * after X's flight, which may set it, put back before the next). (The game's hit number W+0x8C did not stop the
+ * multi-hits for X's bullets: user report 2026-11-07, every frame over an enemy a hit.) */
+#define N_PIERCE 24
+#define PIERCE_HIT 4          /* enemies one bullet remembers */
+#define PIERCE_MARGIN 8.0f    /* px around an enemy's hurt box still "over it" */
+#define PIERCE_COOL 6         /* frames the box stays off when the enemy hit is not known (another pool) */
+static struct {
+    char *w, *e[PIERCE_HIT];
+    void *box;
+    int ne, off, cool;
+} pc[N_PIERCE];
+static int pc_next;
+
+void proj_pierce_new(char *w)   /* axl_x.c aim_one: a new plain bullet while Speed Shot is worn */
+{
+    int i;
+    for (i = 0; i < N_PIERCE && pc[i].w != w; i++)
+        ;
+    if (i == N_PIERCE)
+        i = pc_next++ % N_PIERCE;
+    memset(&pc[i], 0, sizeof pc[i]);
+    pc[i].w = w;
+}
+
+static int over(char *w, char *e)   /* the bullet within the enemy's hurt box (and a margin) */
+{
+    const signed char *b;
+    float ex, ey, hx, hy, dx, dy;
+    if (!O8(e, 8) || !(b = *(const signed char *const *)(e + 0x7C)))
+        return 0;
+    ex = (float)b[4] + (unsigned char)b[6] * 0.5f;
+    ex = *(volatile float *)(e + 0x14) + ((O8(e, 0x29) & 0x40) ? -ex : ex);
+    ey = *(volatile float *)(e + 0x1C) + (float)b[5] + (unsigned char)b[7] * 0.5f;
+    hx = (unsigned char)b[6] * 0.5f + PIERCE_MARGIN;
+    hy = (unsigned char)b[7] * 0.5f + PIERCE_MARGIN;
+    dx = *(volatile float *)(w + 0x14) - ex;
+    dy = *(volatile float *)(w + 0x1C) - ey;
+    return dx < hx && dx > -hx && dy < hy && dy > -hy;
+}
+
+static void pierce_fly(char *task, char *w)
+{
+    int i, k;
+    for (i = 0; i < N_PIERCE && pc[i].w != w; i++)
+        ;
+    if (i == N_PIERCE) {   /* (made before Speed Shot was put on) */
+        proj_pierce_new(w);
+        for (i = 0; i < N_PIERCE && pc[i].w != w; i++)
+            ;
+    }
+    if (pc[i].off) {
+        *(void *volatile *)(w + 0x78) = pc[i].box;
+        pc[i].off = 0;
+    }
+    if (*(volatile signed char *)(w + 0xD4) > 0) {
+        char *e = objs_hurt_obj_near(*(volatile float *)(w + 0x14), *(volatile float *)(w + 0x1C), 48);
+        *(volatile signed char *)(w + 0xD4) = 0;
+        if (e && pc[i].ne < PIERCE_HIT)
+            pc[i].e[pc[i].ne++] = e;
+        else if (!e)
+            pc[i].cool = PIERCE_COOL;
+        if (test_on)
+            test_log("pierce: bullet %p hit %p, flies on", w, (void *)e);
+    }
+    ((task_fn)FLY_ORIG)(task);
+    if (pc[i].w != w || !O8(w, 8) || *(char **)(w + 0xC0) != axl_p)
+        return;
+    k = pc[i].cool > 0;
+    if (pc[i].cool > 0)
+        pc[i].cool--;
+    for (int j = 0; j < pc[i].ne && !k; j++)
+        k = over(w, pc[i].e[j]);
+    if (k && *(void **)(w + 0x78)) {
+        pc[i].box = *(void **)(w + 0x78);
+        *(void *volatile *)(w + 0x78) = 0;
+        pc[i].off = 1;
+    }
+}
+
+int proj_nz_ids[12], proj_nz_n;   /* test 'nzids' (axl_test.c) */
+
 static void __fastcall fly_hook(char *task)
 {
     char *w = *(char **)(task + 0xC0);
@@ -444,28 +531,54 @@ static void __fastcall fly_hook(char *task)
 
     if (q && q->live)
         proj_update(task, w, q);
-    else if ((O8(w, 9) == GUARD_ID || O8(w, 9) == GUARD_STUN_ID || O8(w, 9) == GUARD_WEAK_ID) && O8(w, 0x5E) == GUARD_SLOT &&
-             *(char **)(w + 0xC0) == axl_p) {   /* Axl's guard-break bullet */
+    else if ((O8(w, 9) == GUARD_ID || O8(w, 9) == GUARD_STUN_ID || O8(w, 9) == GUARD_WEAK_ID) &&
+             O8(w, 0x5E) == GUARD_SLOT && *(char **)(w + 0xC0) == axl_p) {   /* Axl's guard-break bullet */
         float x = *(volatile float *)(w + 0x14), y = *(volatile float *)(w + 0x1C);
+        int id;
         /* High Max (user request 2026-10-27): immune until a full charge (id 0x12) stuns him (0 damage, his table
          * PS1 0x8007523C), then saber ids hurt him: near him unstunned the bullet carries X's full-charge id */
         char *nz = objs_table_near(x, y, 48, NZERO_TABLE);
         objs_iframe_open(x, y, 64);   /* (it ignores the hit immunity: user request 2026-10-27) */
-        O8(w, 9) = objs_table_near(x, y, 48, HIGHMAX_TABLE) ? GUARD_STUN_ID : GUARD_ID;
-        /* Nightmare Zero (user request 2026-10-27): weak to Zero's saber, but his table gives the guard-break id 0x18
-         * only 2: near him the bullet carries an id his table takes 8 from */
-        if (nz && O8(nz, 9) == NZERO_TYPE)
-            O8(w, 9) = GUARD_WEAK_ID;
+        id = objs_table_near(x, y, 48, HIGHMAX_TABLE) ? GUARD_STUN_ID : GUARD_ID;
+        if (id == GUARD_ID)   /* guards too (user request 2026-11-07): their tables take the bullet's id */
+            objs_guard_open(x, y, 64, GUARD_ID);
+        /* Nightmare Zero (user request 2026-10-27): weak to the saber, but his table gives the guard-break id 0x18
+         * only 2: near him the bullet carries X's saber id GUARD_WEAK_ID, which makes him flinch (2026-11-08) */
+        if (nz) {   /* (his table alone: type 0x23 on the Yammark stage, 0x35 on the Mijinion stage - user report
+                     * 2026-11-08, the type test had kept the weak id off there) */
+            id = GUARD_WEAK_ID;
+            if (proj_nz_n) {   /* test 'nzids': each guard-break bullet near him carries the next candidate id */
+                static char *last_w;
+                static int next, cur;
+                if (w != last_w) {
+                    last_w = w;
+                    cur = proj_nz_ids[next++ % proj_nz_n];
+                    test_log("nz: bullet %p carries id %02x", w, cur);
+                }
+                id = cur;
+            }
+        }
+        O8(w, 9) = (unsigned char)id;
+        if (test_on && frame_now % 8 == 0) {   /* (what is near it: guard reports, 2026-11-07) */
+            test_log("guard bullet %p at %.0f %.0f id %02x c4 %08x d4 %d", w, x, y, id, O32(w, 0xC4), O8(w, 0xD4));
+            objs_log_near(x, y, 64, id);
+        }
         if ((*(volatile unsigned *)(w + 0xC4) || *(volatile signed char *)(w + 0xD4)) &&
-            (O8(w, 9) == GUARD_STUN_ID || objs_hurt_near(x, y, 48)))
+            (id == GUARD_STUN_ID || objs_hurt_near(x, y, 48))) {
             KILL(task);   /* a saber id's touch leaves W+0xD4 alone and sets W+0xC4 (0 when made), also when it
                            * passes a saber, and X's code lets the shot fly on, hitting every frame: the bullet passes
-                           * sabers and shields but ends at the first enemy it hurts (or stuns), as Axl's others */
+                           * sabers and shields, hits an enemy a few frames (its hurt is seen up to 2 frames late) and
+                           * ends then, or stuns High Max; enemies outside the target pools it passes, hitting (0.0.5's
+                           * feel, user 2026-11-08: no end at all was too strong) */
+        } else
+            ((task_fn)FLY_ORIG)(task);
+    }
+    else {
+        if (axl_pierce && O8(w, 9) == 0 && O8(w, 0xC) == 1 && *(char **)(w + 0xC0) == axl_p && axl_p)
+            pierce_fly(task, w);   /* (Speed Shot worn: Axl's plain bullet flies on through what it hit) */
         else
             ((task_fn)FLY_ORIG)(task);
     }
-    else
-        ((task_fn)FLY_ORIG)(task);
 }
 
 /* once per player frame: entries whose object no longer runs (freed by the game, stage change) are dropped */

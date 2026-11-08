@@ -15,8 +15,8 @@
 
 #define AXL_DATA_FILE "axl_data.bin"
 #define AXL_DATA_MAGIC 0x444C5841u   /* "AXLD" */
-#define AXL_DATA_VERSION 2           /* + 1 at every layout change */
-#define AXL_DATA_SIZE 43976          /* sizeof(axl_data_t): the packer and the DLL agree on the layout */
+#define AXL_DATA_VERSION 3           /* + 1 at every layout change */
+#define AXL_DATA_SIZE 44008          /* sizeof(axl_data_t): the packer and the DLL agree on the layout */
 
 /* ---- the mod's own constants (the generated headers repeat them: a mismatch stops the packer) ---- */
 #define DNA_SEQ_MAX 96
@@ -89,6 +89,8 @@ typedef struct {
     unsigned short hud_pals[N_BOSSES][2 * HUD_LEVELS][16];
     /* axl_dna_looks.h: the turned muzzle flash (lc2_dna.flash_looks) */
     int flash_tex_index, flash_pat;
+    /* axl_pal.h: the 1UP's own palette (lc2_build.oneup_own_pal, axl_items.c) */
+    unsigned short oneup_pal[16];
 } axl_data_t;
 
 _Static_assert(sizeof(axl_data_t) == AXL_DATA_SIZE, "axl_data_t layout changed: AXL_DATA_SIZE, AXL_DATA_VERSION");
@@ -171,6 +173,7 @@ int axl_data_load(void);   /* 1 = axl_data.bin read and checked */
 #define hud_pals (axl_d.hud_pals)
 #define FLASH_TEX_INDEX (axl_d.flash_tex_index)
 #define FLASH_PAT (axl_d.flash_pat)
+#define oneup_pal (axl_d.oneup_pal)
 #endif
 
 #endif

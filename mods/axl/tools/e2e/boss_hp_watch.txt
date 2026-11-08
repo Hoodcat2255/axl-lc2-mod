@@ -1,0 +1,17 @@
+# (probe, 2026-11-08) who writes a boss's hit points: the intro's D-1000 fought by the bot under god (as intro_boss),
+# a write watch on the boss + 0x84 (hit points; + 0x85 the bar) once its bar is full - the writers' EIPs logged
+seq
+wait free == 1 9000
+idle 30
+set 59 2
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+god on
+bot boss
+wait boss_hp > 20 2400
+bwatch 84
+wait boss_hp == 0 5400
+idle 120
+end

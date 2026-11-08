@@ -25,6 +25,10 @@ static int n_late;
 #define TARGET_POOLS objs_target_pools
 #define EBULLET_POOLS objs_ebullet_pools
 unsigned objs_target_pools = 1u << 3 | 1u << 5;   /* enemies (intro stage, 2026-10-26: walkers in pool 5, 3) */
+/* the guard-break bullet's targets: the enemies' pools and pool 10 (user report 2026-11-07, Yammark stage: the pill
+ * bug, type 01, rolled up on the all-immune table 031dea38, open on 031dead8 - pool 10, which held the Shark stage's
+ * press too: only objects with a damage table, hit points and a hurt box count) */
+#define GUARD_POOLS (TARGET_POOLS | 1u << 10)
 unsigned objs_ebullet_pools = 1u << 11;           /* enemy bullets: the pool whose types hold every boss shot type (PS1 *0x1F800084 table) */
 
 /* X's shot code makes a muzzle flash (pool 6) that plays X's shot sound: for our projectiles both are made while
@@ -236,6 +240,7 @@ static unsigned hp_frames;
 #define COMBO_HITS 3   /* (5 for a while: too strong, back to 3, user 2026-10-27) */
 static unsigned tbl_ok[N_POOLS][PER_POOL], tbl_iframe[N_POOLS][PER_POOL];   /* iframe: the table under a hit's immunity */
 static unsigned char combo[N_POOLS][PER_POOL], hp_lo[N_POOLS][PER_POOL];
+static unsigned tbl_prev[N_POOLS][PER_POOL];   /* the table last frame */
 
 static int immune_table(unsigned t)
 {
@@ -254,7 +259,9 @@ static void combo_frame(int k, int i, char *o)
         if (t != tbl_ok[k][i] || !lo)
             combo[k][i] = 0;
         tbl_ok[k][i] = t;
-    } else if (lo < hp_lo[k][i] && lo && tbl_ok[k][i] && axl_p) {   /* hurt just now, the immune table on */
+    } else if (lo < hp_lo[k][i] && lo && tbl_ok[k][i] && axl_p && tbl_prev[k][i] != t) {
+        /* hurt just now, the immune table on with the hit (not a guard's, on before it: the guard-break bullet's hit
+         * through it, 2026-11-07 - the open table went back on a guarding enemy) */
         if (++combo[k][i] < COMBO_HITS) {
             *(volatile unsigned *)(o + 0x80) = tbl_ok[k][i];
             if (test_on)
@@ -266,6 +273,7 @@ static void combo_frame(int k, int i, char *o)
         }
     }
     hp_lo[k][i] = lo;
+    tbl_prev[k][i] = t;
 }
 
 /* the guard-break bullet ignores the hit immunity (user request 2026-10-27): targets within r px of it that are immune
@@ -296,6 +304,192 @@ int objs_iframe_open(float x, float y, int r)
     return n;
 }
 
+/* The guard-break bullet ignores guards too (user request 2026-11-07, "무적 자세까지"): a target whose damage table
+ * blocks its id 0x18 (0xFF bounce / 7 / 8) has that table's 0x18 entry made a hit while the bullet is near: the damage
+ * the least its table takes from any id if some id hurts it (a guard on one side), else the least of the last table
+ * it had that took damage (a guard pose, a closed mouth). The entry goes back GB_HOLD frames after the bullet left.
+ * The table itself, not the target's pointer: enemies in a guard write their guard table every frame before their
+ * hit test (Inami Temple's purple guard, type 09: a copy put on it by the bullet's update was gone again - user report
+ * 2026-11-07, hp 32 stayed). Only id 0x18 changes, and only the guard-break bullet carries it in Axl's game (Zero's
+ * first saber hit too, not in it): the others sharing the table (031DEA38 is the hit immunity's too) are open to the
+ * bullet alone. A table that lets 0x18 through (reaction 2: enemy sabers and shields, made so) is left alone, High
+ * Max keeps his stun rule (axl_proj.c), bosses before their fight (no table taking damage yet) stay immune.
+ * (Before: the bullet took the id the nearest target takes - near a shield it took the shield's and the body behind
+ * bounced it; then a copy of the table on the target - see above.) */
+#define TBL_IDS 64          /* ids 0-63 (2 bytes each; PS1 notes: past 64 is other data) */
+#define GB_HOLD 2           /* frames without the bullet near before the entry goes back */
+#define REACT_PASS 2        /* passes through, no hit */
+#define N_PATCH 8
+static unsigned tbl_hurt[N_POOLS][PER_POOL], tbl_seen[N_POOLS][PER_POOL];   /* the last table taking damage */
+static unsigned char hm_seen[N_POOLS][PER_POOL];
+static struct {
+    unsigned t, at;          /* the table (0 = free), the last frame the bullet was near */
+    unsigned char id, orig[2];
+} patch[N_PATCH];
+
+static int table_readable(unsigned t)
+{
+    return t && !IsBadReadPtr((void *)t, 2 * TBL_IDS);
+}
+
+static int id_hurts(unsigned t, int id)   /* reaction 0 (normal) or 9 (damage, shot gone) with damage > 0 */
+{
+    const unsigned char *e = (const unsigned char *)t + 2 * id;
+    return (e[0] == 0 || e[0] == 9) && (signed char)e[1] > 0;
+}
+
+static int bad_id(int id)   /* not counted: hit stop ids (PS1 notes 3-3 step 4), 0x20 (+w[6] damage) */
+{
+    int d = id - 0x1A;
+    return (d >= 0 && d <= 5) || d == 9 || d == 0x14 || d == 0x19 || d == 0x1F || d == 0x23 || d == 0x24 || id == 0x20;
+}
+
+/* the least damage table t takes from any id (the guard-break hit on it: not a weak spot's), 0 none */
+static int soft_damage(unsigned t)
+{
+    int id, bd = 0;
+    if (!table_readable(t))
+        return 0;
+    for (id = 0; id < TBL_IDS; id++)
+        if (!bad_id(id) && id_hurts(t, id) && (!bd || (signed char)((const unsigned char *)t)[2 * id + 1] < bd))
+            bd = (signed char)((const unsigned char *)t)[2 * id + 1];
+    return bd;
+}
+
+static int is_patched(unsigned t)
+{
+    int j;
+    for (j = 0; j < N_PATCH; j++)
+        if (patch[j].t == t)
+            return 1;
+    return 0;
+}
+
+static void guard_frame(int k, int i, char *o)
+{
+    unsigned t = O8(o, 8) ? *(volatile unsigned *)(o + 0x80) : 0;
+
+    if (!O8(o, 8)) {
+        tbl_hurt[k][i] = tbl_seen[k][i] = 0;
+        hm_seen[k][i] = 0;
+        return;
+    }
+    if (t == HIGHMAX_TABLE)
+        hm_seen[k][i] = 1;
+    if (t != tbl_seen[k][i]) {
+        tbl_seen[k][i] = t;
+        if (soft_damage(t) && !is_patched(t))   /* (one we opened is not its own: 2026-11-07, the guard then
+                                                 * counted as its open table and was never opened again) */
+            tbl_hurt[k][i] = t;
+    }
+}
+
+static int patch_write(unsigned t, int id, const unsigned char *e)
+{
+    DWORD old;
+    unsigned char *a = (unsigned char *)t + 2 * id;
+    if (!VirtualProtect(a, 2, PAGE_READWRITE, &old))
+        return 0;
+    a[0] = e[0];
+    a[1] = e[1];
+    VirtualProtect(a, 2, old, &old);
+    return 1;
+}
+
+static void patches_frame(void)   /* entries the bullet left GB_HOLD frames ago go back */
+{
+    int j;
+    for (j = 0; j < N_PATCH; j++)
+        if (patch[j].t && hp_frames - patch[j].at > GB_HOLD) {
+            patch_write(patch[j].t, patch[j].id, patch[j].orig);
+            if (test_on)
+                test_log("guard: table %08x id %02x back to %02x %02x", patch[j].t, patch[j].id, patch[j].orig[0],
+                         patch[j].orig[1]);
+            patch[j].t = 0;
+        }
+}
+
+static int patched(unsigned t, int id)   /* its index, the bullet seen near now; -1 none */
+{
+    int j;
+    for (j = 0; j < N_PATCH; j++)
+        if (patch[j].t == t && patch[j].id == id) {
+            patch[j].at = hp_frames;
+            return j;
+        }
+    return -1;
+}
+
+/* the guard-break bullet at (x, y) with damage id `id`: the guards of the targets within r px of it open (above) */
+int objs_guard_open(float x, float y, int r, int id)
+{
+    int k, i, j, n = 0;
+    char *o;
+
+    for (k = 0; k < N_POOLS; k++) {
+        if (!(GUARD_POOLS >> k & 1))
+            continue;
+        for (i = 0; i < n_objs[k]; i++) {
+            unsigned t;
+            int dmg;
+            unsigned char hit[2];
+            o = objs[k][i];
+            if (!O8(o, 8) || !*(void **)(o + 0x7C) || !*(volatile unsigned short *)(o + 0x84) || hm_seen[k][i] ||
+                PX(o) - x >= r || x - PX(o) >= r || PY(o) - y >= r || y - PY(o) >= r)
+                continue;
+            t = *(volatile unsigned *)(o + 0x80);
+            if (t == HIGHMAX_TABLE || !table_readable(t) || patched(t, id) >= 0 || id_hurts(t, id))
+                continue;
+            if ((dmg = soft_damage(t)) != 0) {            /* guarded against it only */
+                if (((const unsigned char *)t)[2 * id] == REACT_PASS)
+                    continue;                             /* (made to let it through) */
+            } else if (table_readable(tbl_hurt[k][i]) && id_hurts(tbl_hurt[k][i], id))
+                dmg = ((const signed char *)tbl_hurt[k][i])[2 * id + 1];   /* a guard pose: what its open table takes */
+            else if (!(dmg = soft_damage(tbl_hurt[k][i])))
+                continue;
+            for (j = 0; j < N_PATCH && patch[j].t; j++)
+                ;
+            if (j == N_PATCH)
+                continue;
+            patch[j].orig[0] = ((const unsigned char *)t)[2 * id];
+            patch[j].orig[1] = ((const unsigned char *)t)[2 * id + 1];
+            hit[0] = 0;
+            hit[1] = (unsigned char)dmg;
+            if (!patch_write(t, id, hit))
+                continue;
+            patch[j].t = t;
+            patch[j].id = (unsigned char)id;
+            patch[j].at = hp_frames;
+            n++;
+            if (test_on)
+                test_log("guard: %p type %02x table %08x id %02x %02x %02x -> 00 %02x (hurt table %08x)", o, O8(o, 9), t,
+                         id, patch[j].orig[0], patch[j].orig[1], dmg, tbl_hurt[k][i]);
+        }
+    }
+    return n;
+}
+
+/* test: every live object of any pool within r px of (x, y) - pool, type, table, its entry for id, hit points (the
+ * guard-break bullet against an enemy it does not hurt: which pool, which table) */
+void objs_log_near(float x, float y, int r, int id)
+{
+    int k, i;
+    char *o;
+    for (k = 0; k < N_POOLS; k++)
+        for (i = 0; i < n_objs[k]; i++) {
+            unsigned t;
+            o = objs[k][i];
+            if (!O8(o, 8) || k == 4 || k == 6 || PX(o) - x >= r || x - PX(o) >= r || PY(o) - y >= r || y - PY(o) >= r)
+                continue;
+            t = *(volatile unsigned *)(o + 0x80);
+            test_log("near pool %d%s %p type %02x xy %.0f %.0f table %08x id %02x -> %02x %02x, hurt table %08x, "
+                     "hp %u, box %p", k, (GUARD_POOLS >> k & 1) ? "" : " (not a guard pool)", o, O8(o, 9), PX(o),
+                     PY(o), t, id, table_readable(t) ? ((unsigned char *)t)[2 * id] : 0xEE,
+                     table_readable(t) ? ((unsigned char *)t)[2 * id + 1] : 0xEE, k < N_POOLS ? tbl_hurt[k][i] : 0,
+                     *(volatile unsigned short *)(o + 0x84), *(void **)(o + 0x7C));
+        }
+}
+
 void objs_hp_frame(void)
 {
     int k, i;
@@ -303,12 +497,15 @@ void objs_hp_frame(void)
     unsigned short hp;
 
     hp_frames++;
+    patches_frame();
     for (k = 0; k < N_POOLS; k++) {
-        if (!(TARGET_POOLS >> k & 1))
+        if (!(GUARD_POOLS >> k & 1))
             continue;
         for (i = 0; i < n_objs[k]; i++) {
             o = objs[k][i];
-            combo_frame(k, i, o);
+            if (TARGET_POOLS >> k & 1)
+                combo_frame(k, i, o);
+            guard_frame(k, i, o);
             hp = O8(o, 8) ? *(volatile unsigned short *)(o + 0x84) : 0;
             if (hp < hp_seen[k][i])
                 hurt_at[k][i] = hp_frames;
@@ -321,6 +518,8 @@ void objs_hp_frame(void)
     }
 }
 
+/* (the guard-break bullet's end: the target pools only, as in 0.0.5 - with pool 10 (GUARD_POOLS, 2026-11-07) it ended
+ * on enemies it used to pass, user report 2026-11-08) */
 int objs_hurt_near(float x, float y, int r)
 {
     int k, i;
@@ -334,6 +533,31 @@ int objs_hurt_near(float x, float y, int r)
                 return 1;
     }
     return 0;
+}
+
+/* the enemy hurt (hit points down) within the last 2 player frames nearest to (x, y) within r px, 0 none (the piercing
+ * bullet: what it went through) */
+char *objs_hurt_obj_near(float x, float y, int r)
+{
+    int k, i;
+    char *best = 0;
+    float bd = (float)r * r * 2, dx, dy;
+
+    for (k = 0; k < N_POOLS; k++) {
+        if (!(GUARD_POOLS >> k & 1))
+            continue;
+        for (i = 0; i < n_objs[k]; i++) {
+            if (!hurt_at[k][i] || hp_frames - hurt_at[k][i] > 2)
+                continue;
+            dx = hurt_x[k][i] - x;
+            dy = hurt_y[k][i] - y;
+            if (dx < r && dx > -r && dy < r && dy > -r && dx * dx + dy * dy < bd) {
+                bd = dx * dx + dy * dy;
+                best = objs[k][i];
+            }
+        }
+    }
+    return best;
 }
 
 /* a live enemy / boss within r px of (x, y) whose damage table (+0x80) is table */

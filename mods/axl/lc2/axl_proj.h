@@ -8,6 +8,8 @@
 #define P_HIDDEN 32   /* not drawn (a body attack box that follows Axl) */
 #define P_HUD 64      /* the skill HUD's (axl_hud.c): not moved, no anim step, shown / hidden by its owner */
 #define P_GIGA 128    /* a giga attack's (axl_dna_bosses.c, charged damage ids): gone with the change as ids 1-8 */
+#define P_HIT1 256    /* with proj_nobox: X's shot's own box for its first frame (a buster hit where it is made: Axl's
+                       * Giga Crush barrage - its damage came from these, user 2026-11-08) */
 
 typedef struct proj proj;
 typedef void (*proj_fn)(char *w, proj *q);
@@ -35,6 +37,7 @@ void proj_nobox(char *w);                        /* no attack box (terrain box k
 void proj_boss_look(char *w, int anim);          /* the bosses' projectile pictures, Axl's FX_* anim */
 void proj_set_anim(char *w, int anim);
 void proj_fx_look(char *w, int frame);
+#define PROJ_TEX0 0x100   /* proj_pose_look tex: texture index 0 (the shared pictures, com00) - 0 means the FX one */
 void proj_pose_look(char *w, int tex, int pat, int frame);   /* frame of any texture / parts section, held */           /* FX picture (FX_PAT frame) held, from our own table fx_table */
 int proj_spawned(char *w);                       /* axl_x.c: X's shot spawner made w; 1 = it is ours */
 void proj_frame(void);

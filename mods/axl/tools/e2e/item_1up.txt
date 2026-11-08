@@ -1,0 +1,21 @@
+# The 1UP's own palette (axl_items.c, user request 2026-11-08): every dropped item is turned to the 1UP's anim
+# (item1up, its palette slot 11 as a real 1UP's), which the DLL then moves to the 1UP palette slot; the bot shoots through the intro under god (a drop near
+# frame 9770 in the probe), snaps every 2 s from there
+item1up
+seq
+wait free == 1 9000
+god on
+bot right
+idle 1700
+snap
+idle 60
+snap
+idle 60
+snap
+idle 120
+snap
+idle 600
+snap
+idle 1800
+snap
+end

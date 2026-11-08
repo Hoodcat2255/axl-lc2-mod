@@ -200,7 +200,11 @@ static signed char hand_orig[N_HANDS][2];
  * X's hand, the flash at Axl's hips (user report 2026-10-27) */
 #define HAND_B ((volatile signed char *)0x031DC110)
 #define ZIP_AIM_B 66
-static signed char hand_b_orig[12][2];   /* the 8 rope aims, then the 4 ladder aims */
+static signed char hand_b_orig[14][2];   /* the 8 rope aims, the 4 ladder aims, then the 2 wall aims */
+/* the flash's hand reads the bank of X_BANK[anim], a table of X's anims 0-223 only: for the wall aims (229 / 230) it
+ * reads other data (148 / 29 in the e2e log), not 0, so bank B's hand at frames 244 / 245 - (0, 0), the flash at Axl's
+ * feet and not the gun (user report 2026-11-05; wall_aim_flash). Bank B's 244 / 245 get the wall aim tips too */
+#define WALL_AIM_F 244
 static int hand_state = -1;   /* -1 unknown, 0 X's, 1 Axl's */
 
 /* X's bank table (FUN_023aea40: anim -> 0 bank A, 1 bank B = texture 10, PAT section 18): Axl's victory anim 39
@@ -225,6 +229,14 @@ static void hand_table(int on)
             hand_b_orig[i][0] = HAND_B[2 * (ZIP_AIM_B + i)];
             hand_b_orig[i][1] = HAND_B[2 * (ZIP_AIM_B + i) + 1];
         }
+        for (i = 0; i < 2; i++) {
+            hand_b_orig[12 + i][0] = HAND_B[2 * (WALL_AIM_F + i)];
+            hand_b_orig[12 + i][1] = HAND_B[2 * (WALL_AIM_F + i) + 1];
+        }
+    }
+    for (i = 0; i < 2; i++) {
+        HAND_B[2 * (WALL_AIM_F + i)] = on ? -tip_wall_aim[i][0] : hand_b_orig[12 + i][0];
+        HAND_B[2 * (WALL_AIM_F + i) + 1] = on ? tip_wall_aim[i][1] : hand_b_orig[12 + i][1];
     }
     for (i = 0; i < 12; i++) {   /* rope: pose i / 2, up (even) / down (odd) diagonal; then 74-77 the ladder aims */
         const signed char *t = i < 8 ? tip_rope[i / 2][i & 1 ? 2 : 0] : tip_ladder[i - 8];
@@ -537,6 +549,13 @@ static void hover_after(char *p)
 #define DIAG 181              /* 256 * cos 45 */
 #define GUARD_EVERY 8         /* X8: every 8th bullet breaks guards, drawn blue */
 #define GUARD_EVERY_WHITE 4   /* White Axl (armour 4): every 4th (user request 2026-10-27: shorter) */
+#define GUARD_EVERY_RAPID 4   /* the Rapid 5 part worn: every 4th too (user request 2026-11-07) */
+static int part_rapid;        /* this frame: Rapid 5 worn (charge_hide) */
+/* Speed Shot (user request 2026-11-07: worn, no difference to be seen): Axl's plain bullets pierce - every enemy on
+ * their way once, on to the edge of the screen (axl_proj.c fly_hook: their hit result cleared, a hit number each) -
+ * and fly at least SPEED_SHOT_V (X's bullet 6.75 px/f here, PS1 notes: the part 8 -> 10, x 1.25) */
+#define SPEED_SHOT_V 0x87000   /* 8.44 px/f */
+int axl_pierce;               /* this frame: Speed Shot worn (charge_hide; axl_proj.c) */
 #define W_X(w) (*(volatile float *)((w) + 0x14))
 #define W_Y(w) (*(volatile float *)((w) + 0x1C))
 typedef struct { char *w; int age, dir, id, fixed, guard; s32 vx, vy; float x, y; const signed char *tip; } track_t;
@@ -665,7 +684,8 @@ void axl_spawned(char *w, int kind, int id, int sub, char *owner)
     /* the guard-break bullet is chosen when it is made: its damage id goes in at its set-up (axl_shot_setup), before
      * anything it touches at the gun tip tests it (set at the aim, a frame later, it was a plain bullet point-blank) */
     track[i].guard = id == 0 &&
-                     (++shot_count % (armor() == 4 ? GUARD_EVERY_WHITE : GUARD_EVERY) == 0 || axl_guard_test);
+                     (++shot_count % (armor() == 4 ? GUARD_EVERY_WHITE : part_rapid ? GUARD_EVERY_RAPID : GUARD_EVERY) == 0 ||
+                      axl_guard_test);
     track[i].tip = tip;
     track[i].fixed = spawn_fixed.on;
     if (spawn_fixed.on) {   /* before its first update: shots that do not take X's hand position start here */
@@ -761,6 +781,8 @@ static char *flash_w[N_FLASH];
 static int flash_k[N_FLASH], flash_seen[N_FLASH];   /* (flash_seen: test, the frame logged) */
 static unsigned flash_t0[N_FLASH];                  /* frame_count when it was made */
 int axl_flash_dir = -1;   /* test: the direction of the last flash turned (axl_test.c flash_dir) */
+int axl_flash_off = -1;   /* test: px between the last flash turned and its bullet's start (axl_test.c flash_off) */
+static const signed char *flash_tip[N_FLASH];   /* the gun tip of the flash's shot (its bullet starts there) */
 
 static void flash_init(void)
 {
@@ -799,6 +821,7 @@ static void flash_note(char *o, int dir)
     flash_k[i] = ((-rel * FLASH_DIRS / 360) % FLASH_DIRS + FLASH_DIRS) % FLASH_DIRS;
     flash_t0[i] = frame_count;
     flash_seen[i] = -1;
+    flash_tip[i] = tip;
 }
 
 /* 1 = w shows anim FLASH_ANIM turned to direction k (0 = not the flash's script: not set up yet, or another anim) */
@@ -846,6 +869,17 @@ void axl_flash_frame(void)
         if (!flash_turn(w, flash_k[i]))
             continue;   /* (not set up yet: its first update sets its anim) */
         if (test_on && flash_seen[i] != O8(w, 0x66)) {
+            if (flash_seen[i] < 0 && player_p && flash_tip[i]) {   /* its first picture: where it is against where
+                * its bullet starts (aim_one: Axl's place + the tip, mirrored by his facing) */
+                int right = FACING(player_p) & FACE_RIGHT;
+                float bx = *(float *)(player_p + 0x14) + (right ? flash_tip[i][0] : -flash_tip[i][0]);
+                float by = POS_Y(player_p) + flash_tip[i][1];
+                float ox = W_X(w) - bx, oy = W_Y(w) - by;
+                axl_flash_off = (int)((fabsf(ox) > fabsf(oy) ? fabsf(ox) : fabsf(oy)) + 0.5f);
+                test_log("flash place w %p xy %.1f %.1f bullet start %.1f %.1f off %.1f %.1f | axl state %d anim %d "
+                         "frame %d facing %02x, flash facing %02x", w, W_X(w), W_Y(w), bx, by, ox, oy, STATE(player_p),
+                         ANIM(player_p), O8(player_p, 0x66), FACING(player_p), O8(w, 0x29));
+            }
             flash_seen[i] = O8(w, 0x66);
             test_log("flash w %p dir %d frame %d tex %d pat %d", w, flash_k[i], O8(w, 0x66), O32(w, 0x54), O32(w, 0x58));
         }
@@ -973,9 +1007,13 @@ static void aim_one(char *p, track_t *t)
 
     W_X(w) = *(float *)(p + 0x14) + (right ? t->tip[0] : -t->tip[0]);
     W_Y(w) = *(float *)(p + 0x1C) + t->tip[1];
+    if (axl_pierce && t->id == 0 && O32(w, 0x3C) < SPEED_SHOT_V && O32(w, 0x3C) > -SPEED_SHOT_V)
+        O32(w, 0x3C) = O32(w, 0x3C) < 0 ? -SPEED_SHOT_V : SPEED_SHOT_V;   /* (aim_velocity takes its size) */
     aim_velocity(w, t->dir, right);
     if (t->id == 0)
         home_add(w);
+    if (axl_pierce && t->id == 0 && !t->guard)
+        proj_pierce_new(w);
     if (t->guard) {
         O8(w, 9) = GUARD_ID;            /* sabers and shields do not stop it */
         O8(w, 0x5E) = GUARD_SLOT;       /* the same bullet in blue (user request 2026-10-26) */
@@ -1163,6 +1201,9 @@ static void copy_charge(char *p, int held)   /* 1 held (a frame on), 0 let go, -
 #define PARTS_EQ(p) (*(volatile unsigned *)((p) + 0x258))
 #define PART_FULL 0x80000u
 #define PART_QUICK 0x100000u
+#define PART_SPEED 0x100u     /* Speed Shot (axl_pierce) */
+#define PART_RAPID 0x40000u   /* Rapid 5 (X's on-screen limit table; Axl's limit is his own: the guard-break bullet
+                               * comes every GUARD_EVERY_RAPID-th instead) */
 /* the limited part in use B + 0x1FC (P + 0x2B8; PS1 P+0x144): 6 = Overdrive, every buster shot charged for 480
  * frames (FUN_023aed40; docs/research-x6-parts-bits-20261029.md) - its timer runs outside X's update (FUN_020afc40) */
 #define LIMITED(p) (*(volatile int *)((p) + 0x2B8))
@@ -1196,6 +1237,8 @@ static void charge_hide(char *p)
         part_full = ((hidden_parts | eq) & PART_FULL) != 0;   /* (Overdrive left to X: its shots are X's charge
                                                                * buster for its 480 frames - user decision 2026-10-29) */
         part_quick = ((hidden_parts | eq) & PART_QUICK) != 0;
+        part_rapid = ((hidden_parts | eq) & PART_RAPID) != 0;
+        axl_pierce = ((hidden_parts | eq) & PART_SPEED) != 0;
     }
     *OPT_BYTE = (unsigned char)(hidden_opt & ~3);   /* (bit 1, held = rapid fire, too: Axl fires so anyway - user
                                                      * request 2026-10-29, the option on or off no difference) */
@@ -1298,11 +1341,119 @@ static char *game_st(void)
     return g ? g + 0x70 : 0;
 }
 
+static unsigned copy_gone;   /* axl_frames when the copy shot was last gone */
+static DWORD axl_on_tick;    /* GetTickCount of the last frame Axl played (normal X) */
+
+static int copy_kills(void)   /* a boss dying now counts as the copy shot's kill (dna_watch_copy) */
+{
+    return copy_out() || axl_frames - copy_gone <= DNA_LATE;
+}
+
+/* The copy shot's chance (user request 2026-11-08): a stage boss (stages 1-8) whose DNA Axl has not got, hit by
+ * anything but the copy shot for damage that would end it, keeps 1 hit point for HOLD_FRAMES (5 s): hits in that time
+ * leave it at 1, the copy shot ends it (its DNA, dna_watch_copy). After that it is held no more (the next hit ends it,
+ * without DNA if not the copy shot); once per fight (a boss seen again with more than 1 hit point is a new fight). The
+ * game's damage routine (PS1 FUN_800315cc; RXC2 0x023CFC48..) writes the new hit points through the setter
+ * FUN_020a6490 (byte + 0x10 of the object's component at + 0x74 = the object's + 0x84) at 0x023CFCE0, then ends a
+ * target whose hit points are not above 0: that call comes here (axl_hook.c). While such a boss has 1 hit point (held
+ * or come down to it) it looks groggy: little smoke puffs rise from its body (groggy_tick). */
+#define HOLD_FRAMES 300
+#define LAYER_FRONT_ 0       /* (= LAYER_FRONT, below) */
+static int giga_rand(int n);
+static char *hold_boss;          /* the boss held this fight (0 none yet) */
+int axl_hold_any;                /* test 'holdany' (axl_test.c) */
+static unsigned hold_until;      /* frame_count the hold ends */
+
+/* o: the Maverick of this stage (1-8: not the boss rematch rooms, scenes 19-22, nor Sigma, nor other bosses - user
+ * request 2026-11-08) in a fight whose DNA Axl lacks */
+static int hold_target(char *o)
+{
+    char *st = game_st();
+    int stage;
+    if (!st || !axl_p || !o)
+        return 0;
+    stage = (unsigned char)st[0x48];
+    if (axl_hold_any && stage == 0)
+        return O8(o, 9) == 0x30;   /* (test 'holdany': the intro's D-1000) */
+    return stage >= 1 && stage <= 8 && O8(o, 9) == dna_stage_boss_type(stage) &&
+           !(*(volatile unsigned *)(st + SAVE_PARTS_AT) & DNA_BIT(stage));
+}
+
+void __fastcall axl_boss_hp_set(char *comp, void *edx, int v)
+{
+    char *o = comp - 0x74;
+    (void)edx;
+    if ((signed char)v <= 0 && hold_target(o) && !copy_kills() && GetTickCount() - axl_on_tick < 250) {
+        if (!hold_boss) {
+            hold_boss = o;
+            hold_until = frame_count + HOLD_FRAMES;
+            if (test_on)
+                test_log("boss %p held at 1 hit point for %d frames (copy shot's chance)", o, HOLD_FRAMES);
+        }
+        if (hold_boss == o && (int)(hold_until - frame_count) > 0)
+            v = 1;
+    }
+    *(volatile unsigned char *)(comp + 0x10) = (unsigned char)v;
+}
+
+/* groggy: a smoke puff (the shared pictures' little puff, com00 by parts section 2 frames 24-32) rising from the boss.
+ * Texture index 0 = com00 (X's shot: tex 0 pat 1, his effects tex 0 pat 12 - 2026-11-08 logs) */
+#define PUFF_TEX PROJ_TEX0
+#define PUFF_PAT 2
+#define PUFF_F0 24
+#define PUFF_N 9
+#define PUFF_STEP 3       /* frames per picture */
+#define PUFF_EVERY 7      /* frames between two puffs */
+#define PUFF_SLOT 7       /* + its pictures' palette bit 1: the stages' shared slot 8 (pale white-yellow, the same in every stage) */
+static void puff_fn(char *w, proj *q)
+{
+    int f = q->t / PUFF_STEP;
+    if (f >= PUFF_N) {
+        proj_kill(w);
+        return;
+    }
+    proj_pose_look(w, PUFF_TEX, PUFF_PAT, PUFF_F0 + f);
+    O16(w, 0x5E) = PUFF_SLOT;
+    O8(w, 0x2A) = LAYER_FRONT_;
+    if (test_on && q->t == 4) {
+        static int n;
+        if (n++ < 6)
+            test_log("puff %p hdr %02x %02x tex %d pat %d pal %d frame %d anim %d layer %d xy %.0f %.0f table %p", w,
+                     O8(w, 8), O8(w, 9), O32(w, 0x54), O32(w, 0x58), O16(w, 0x5E), O8(w, 0x66), O8(w, 0x2B),
+                     O8(w, 0x2A), *(volatile float *)(w + 0x14), *(volatile float *)(w + 0x1C), *(void **)(w + 0x4C));
+    }
+}
+
+static void groggy_tick(char *b, int hp)
+{
+    static unsigned last;
+    const signed char *box;
+    float x, y, w, h;
+    char *pw;
+
+    if (!b || hp != 1 || (b != hold_boss && !hold_target(b)) || frame_count - last < PUFF_EVERY)
+        return;   /* (at 1 hit point, held or come down to it: user report 2026-11-08, Yammark at 1 showed none) */
+    last = frame_count;
+    box = *(const signed char *const *)(b + 0x7C);
+    w = box ? (unsigned char)box[6] : 32;
+    h = box ? (unsigned char)box[7] : 32;
+    x = *(volatile float *)(b + 0x14) + (box ? (float)box[4] : -16) * ((O8(b, 0x29) & 0x40) ? -1 : 1);
+    y = *(volatile float *)(b + 0x1C) + (box ? (float)box[5] : -32);
+    if (O8(b, 0x29) & 0x40)
+        x -= w;
+    x += (float)giga_rand((int)w + 1);
+    y += (float)giga_rand((int)(h * 0.6f) + 1);
+    pw = proj_spawn(0, x, y, 0, -0x6000, 1, PUFF_N * PUFF_STEP + 2, puff_fn, P_PIERCE | P_WALL | P_NOSCREEN);
+    if (pw) {
+        proj_nobox(pw);
+        puff_fn(pw, proj_of(pw));
+    }
+}
+
 static void dna_watch_copy(char *p)
 {
     static char *boss;
     static int boss_hp, copy_seen;
-    static unsigned copy_gone;
     char *st = game_st(), *b = objs_boss();
     int hp, stage;
 
@@ -1314,12 +1465,16 @@ static void dna_watch_copy(char *p)
     }
     if (!st || !b) {
         boss = 0;
+        hold_boss = 0;
         return;
     }
     hp = *(volatile unsigned char *)(b + 0x84);   /* (the hit points; + 0x85 is the bar's fill, 2026-10-28 log) */
+    if (hold_boss && (b != hold_boss || hp > 1))
+        hold_boss = 0;   /* (another boss, or the fight again: a hold anew) */
+    groggy_tick(b, hp);
     stage = (unsigned char)st[0x48];
     if (b == boss && boss_hp > 0 && hp == 0 && stage >= 1 && stage <= 8) {
-        int copy = copy_out() || axl_frames - copy_gone <= DNA_LATE;
+        int copy = copy_kills();
         if (copy)
             *(volatile unsigned *)(st + SAVE_PARTS_AT) |= DNA_BIT(stage);
         if (test_on)
@@ -1462,16 +1617,26 @@ static void hover_jets(char *p)
 /* Giga Crush (user request 2026-10-27): the giga gauge fills as X takes hits; when it is full the giga button (0x40;
  * X's own Nova Strike is masked) plays Axl's giga pose (anim 39: crouch, then the sheet's giga poses, held arms out),
  * a gun spins in each hand (the sheet's giga gun turned 8 ways, faster and faster), then the screen flashes and every
- * enemy within the screen around Axl gets the sheet's burst and a hit (damage id GIGA_ID). The pictures and their
+ * enemy on the screen gets the sheet's burst and a hit (damage id GIGA_ID). The pictures and their
  * palette are lc2_dna.giga_pictures (FX texture, frames GIGA_BASE..); the palette goes to a free CLUT slot meanwhile.
  * Not while changed (the button is the DNA button then). */
 #define ANIM_GIGA 245         /* lc2_hook.PC_SCRIPTS: the giga poses (X's anim 39 is the victory again) */
-#define GIGA_LEN 96           /* frames from the press to the end */
+#define GIGA_LEN 126          /* frames from the press to the end */
 #define GIGA_SPIN_AT 24       /* the pose is out (frame 186): the guns appear */
-#define GIGA_HIT_AT 70        /* the flash, the bursts and the hits */
+/* the barrage (user request 2026-11-07: the screen under fire, the enemies shaking under it, then the damage): from
+ * GIGA_FIRE_AT to GIGA_HIT_AT, GIGA_FIRE_N buster hit sparks every GIGA_FIRE_GAP frames - half on the targets'
+ * bodies, half anywhere on the screen - X's shot sound every GIGA_FIRE_SND frames, every target within the screen
+ * shaking GIGA_SHAKE px left / right (net 0: put back at the end) */
+#define GIGA_FIRE_AT 34
+#define GIGA_FIRE_GAP 2
+#define GIGA_FIRE_N 2
+#define GIGA_FIRE_SND 4
+#define GIGA_SHAKE 2.0f
+#define GIGA_SCREEN_X 128     /* the barrage's spread: the view (256 x 224) around Axl */
+#define GIGA_SCREEN_Y 96
+#define SND_SHOT 8            /* pl00 request 8: the shot (lc2_build AXL_SOUNDS) */
+#define GIGA_HIT_AT 100       /* the flash, the bursts and the hits */
 #define GIGA_ID 0x16          /* X's Nova Strike id: 8 on Nightmare Zero's table (most enemy tables take it) */
-#define GIGA_RX 180           /* the screen around Axl (LC2's X6 view is 256 x 224 game pixels; a bit more) */
-#define GIGA_RY 130
 #define GIGA_MAX 24
 #define LAYER_FRONT 0
 static const signed char giga_hand[2][2] = {{-30, -12}, {26, -10}};   /* facing left (data): front / back hand */
@@ -1480,6 +1645,16 @@ static int giga_t, giga_slot = -1;
 static int roll_t, roll_dir;   /* the dodge roll (roll_before / roll_after) */
 static unsigned short giga_orig[16];
 static char *giga_gun[2];
+static char *giga_tg[GIGA_MAX];   /* the barrage's targets (shaking) */
+static int giga_tn;
+static float giga_shook[GIGA_MAX];   /* each one's shake offset now */
+static unsigned giga_rng = 0x2545F491u;
+
+static int giga_rand(int n)   /* 0 .. n - 1 */
+{
+    giga_rng = giga_rng * 1103515245u + 12345u;
+    return (int)((giga_rng >> 16) % (unsigned)n);
+}
 
 static void giga_look(char *w, int i)   /* Giga picture i (its own held anim, else the shot's script moves on) */
 {
@@ -1548,19 +1723,99 @@ static void giga_palette(int on)
     }
 }
 
+static void giga_spark_fn(char *w, proj *q)   /* one impact: the buster's hit spark at w, then gone */
+{
+    (void)q;
+    proj_spark(w);
+    proj_kill(w);
+}
+
+static int giga_live(char *o)   /* still a target (alive, its hurt box on) */
+{
+    return O8(o, 8) && *(void **)(o + 0x7C);
+}
+
+static void giga_shake_end(void)   /* every target back where its shake left it */
+{
+    int i;
+    for (i = 0; i < giga_tn; i++)
+        if (giga_shook[i] != 0 && giga_live(giga_tg[i]))
+            *(volatile float *)(giga_tg[i] + 0x14) -= giga_shook[i];
+    giga_tn = 0;
+}
+
+/* the giga's targets: every live enemy on the screen (user request 2026-11-08: the whole screen, not around Axl) -
+ * the game's own off-screen test (PS1 FUN_8002cbfc, 0x023BC5D0: 1 = out of the 320 x 240 view by more than a, b) */
+typedef int(__fastcall *giga_screen_fn)(char *scr, void *edx, char *w, int a, int b);
+#define GIGA_OFF_SCREEN ((giga_screen_fn)0x023BC5D0)
+#define GIGA_SCREEN_OBJ (*(char **)0x041D8E58)   /* (axl_proj.c SCREEN) */
+#define GIGA_EDGE 8            /* px past the view's edges that still count */
+static int giga_targets(char *p, char **out)
+{
+    char *all[GIGA_MAX];
+    int n = objs_targets(*(float *)(p + 0x14), *(float *)(p + 0x1C), 4096, 4096, all, GIGA_MAX), i, m = 0;
+    for (i = 0; i < n; i++)
+        if (!GIGA_OFF_SCREEN(GIGA_SCREEN_OBJ, 0, all[i], GIGA_EDGE, GIGA_EDGE))
+            out[m++] = all[i];
+    return m;
+}
+
+static void giga_barrage(char *p, int t)
+{
+    float ax = *(float *)(p + 0x14), ay = *(float *)(p + 0x1C), x, y;
+    int i, k;
+
+    if (t == GIGA_FIRE_AT) {
+        giga_shake_end();
+        giga_tn = giga_targets(p, giga_tg);
+        for (i = 0; i < giga_tn; i++)
+            giga_shook[i] = 0;
+        giga_rng ^= frame_count;
+        if (test_on)
+            test_log("giga barrage: %d targets", giga_tn);
+    }
+    for (i = 0; i < giga_tn; i++) {   /* the shake: +, -, +, - .. (one step each frame) */
+        float d;
+        if (!giga_live(giga_tg[i])) {
+            giga_shook[i] = 0;
+            continue;
+        }
+        d = giga_shook[i] > 0 ? -GIGA_SHAKE : GIGA_SHAKE;
+        *(volatile float *)(giga_tg[i] + 0x14) += d;
+        giga_shook[i] += d;
+    }
+    if ((t - GIGA_FIRE_AT) % GIGA_FIRE_GAP == 0)
+        for (k = 0; k < GIGA_FIRE_N; k++) {
+            if (giga_tn && (k & 1) == 0 && giga_live(giga_tg[i = giga_rand(giga_tn)])) {
+                x = *(volatile float *)(giga_tg[i] + 0x14) + (float)(giga_rand(25) - 12);   /* on a target's body */
+                y = *(volatile float *)(giga_tg[i] + 0x1C) + (float)(giga_rand(25) - 12);
+            } else {
+                x = ax + (float)(giga_rand(2 * GIGA_SCREEN_X) - GIGA_SCREEN_X);
+                y = ay + (float)(giga_rand(2 * GIGA_SCREEN_Y) - GIGA_SCREEN_Y) - 16;
+            }
+            {
+                char *w = proj_spawn(0, x, y, 0, 0, 1, 2, giga_spark_fn, P_PIERCE | P_WALL | P_NOSCREEN | P_HIDDEN | P_HIT1);
+                if (w)
+                    proj_nobox(w);
+            }
+        }
+    if ((t - GIGA_FIRE_AT) % GIGA_FIRE_SND == 0)
+        axl_sound(SND_SHOT);
+}
+
 static void giga_hit(char *p)
 {
     char *tg[GIGA_MAX], *w;
     int n, i;
 
     dna_screen_flash();
-    n = objs_targets(*(float *)(p + 0x14), *(float *)(p + 0x1C), GIGA_RX, GIGA_RY, tg, GIGA_MAX);
+    n = giga_targets(p, tg);
     for (i = 0; i < n; i++) {
         float x = *(volatile float *)(tg[i] + 0x14), y = *(volatile float *)(tg[i] + 0x1C);
         w = proj_spawn(GIGA_ID, x, y, 0, 0, 1, 4, 0, P_PIERCE | P_WALL | P_NOSCREEN | P_HIDDEN);
         if (w)
             proj_box(w, box_giga);
-        w = proj_spawn(0, x, y, 0, 0, 1, 3 * GIGA_BURST + 1, giga_burst_fn, P_PIERCE | P_WALL | P_NOSCREEN);
+        w = proj_spawn(0, x, y, 0, 0, 1, 3 * GIGA_BURST + 1, giga_burst_fn, P_PIERCE | P_WALL | P_NOSCREEN | P_HIT1);
         if (w)
             proj_nobox(w);
     }
@@ -1617,6 +1872,21 @@ static void roll_after(char *p)
     }
 }
 
+static int giga_air;            /* the Giga Crush started in the air */
+static float giga_x, giga_y;    /* where */
+
+static void giga_hold(char *p)   /* in the air: no move, no fall, before and after X's update (X's jump state may
+                                  * hand over to its fall, gravity back on for a frame: the place kept as well) */
+{
+    if (!giga_t || !giga_air)
+        return;
+    VX(p) = 0;
+    VY(p) = 0;
+    GRAVITY(p) = 0;
+    *(volatile float *)(p + 0x14) = giga_x;
+    POS_Y(p) = giga_y;
+}
+
 static void giga_anim(char *p)
 {
     X_ANIM_BANK(p, ANIM_IDLE);
@@ -1625,13 +1895,19 @@ static void giga_anim(char *p)
 
 static void giga_before(char *p)
 {
-    if (!giga_t && !dna_boss && (NEWP(p) & B_GIGA) && GIGA_GAUGE(p) >= ENERGY_MAX(p) && on_ground(STATE(p)) &&
-        !LOCK(p)) {
+    /* in the air too (user request 2026-11-07): he stays where he is until it ends (giga_hold), then falls */
+    if (!giga_t && !dna_boss && (NEWP(p) & B_GIGA) && GIGA_GAUGE(p) >= ENERGY_MAX(p) &&
+        (on_ground(STATE(p)) || in_air(STATE(p))) && !LOCK(p)) {
         GIGA_GAUGE(p) = 0;
         giga_t = GIGA_LEN;
+        giga_air = in_air(STATE(p));
+        giga_x = *(volatile float *)(p + 0x14);
+        giga_y = POS_Y(p);
+        hovering = adash_t = 0;
+        AFTERIMAGE(p) = 0;
         giga_anim(p);
         if (test_on)
-            test_log("giga start");
+            test_log("giga start%s state %d", giga_air ? " in the air" : "", STATE(p));
     }
     HELD(p) &= ~B_GIGA;
     NEWP(p) &= ~B_GIGA;
@@ -1639,6 +1915,7 @@ static void giga_before(char *p)
         HELD(p) = 0;
         NEWP(p) = 0;
     }
+    giga_hold(p);
 }
 
 static void giga_after(char *self, char *p)
@@ -1647,6 +1924,7 @@ static void giga_after(char *self, char *p)
 
     if (!giga_t)
         return;
+    giga_hold(p);
     t = GIGA_LEN - giga_t;
     if (ANIM(p) != ANIM_GIGA)
         giga_anim(p);
@@ -1663,14 +1941,23 @@ static void giga_after(char *self, char *p)
     }
     if (t > GIGA_SPIN_AT && giga_slot >= 0 && !dna_flashing())
         giga_palette(1);   /* (kept up: the screen flash puts its saved CLUTs back) */
-    if (t == GIGA_HIT_AT)
+    if (t >= GIGA_FIRE_AT && t < GIGA_HIT_AT)
+        giga_barrage(p, t);
+    if (t == GIGA_HIT_AT) {
+        giga_shake_end();
         giga_hit(p);
+    }
     if (--giga_t == 0) {
         for (i = 0; i < 2; i++)
             if (giga_gun[i] && proj_of(giga_gun[i]))
                 proj_kill(giga_gun[i]);
         giga_gun[0] = giga_gun[1] = 0;
-        set_anim(p, ANIM_IDLE);
+        if (giga_air || in_air(STATE(p))) {   /* (the fall from where he stopped) */
+            GRAVITY(p) = X_GRAVITY(p);
+            set_anim(p, ANIM_FALL);
+        } else
+            set_anim(p, ANIM_IDLE);
+        giga_air = 0;
     }
     if (giga_t == 0 || t == GIGA_LEN - 1)
         giga_palette(0);
@@ -1841,12 +2128,14 @@ void axl_frame(char *self, x_fn orig)
     warn_tick();
     frame_count++;
     axl_frames++;
+    if (on)
+        axl_on_tick = GetTickCount();   /* (the boss hold: Axl plays now) */
     special_new = (NEWP(p) & B_SPECIAL) != 0;
     charge_unhide();   /* (a frame whose post did not run) */
     if (on && INIT(p) == 1)
         charge_hide(p);   /* (X's auto charge / full-charge part off for X's update: the copy shot's, copy_auto) */
     else
-        opt_auto = part_full = part_quick = 0;
+        opt_auto = part_full = part_quick = part_rapid = axl_pierce = 0;
     shot_new = (NEWP(p) & B_SHOT) != 0;
     /* R: the changed boss's second attack (user request 2026-10-28: L and R both opening the ring was a waste; the
      * giga button stays the Giga Attack - Axl's Giga Crush, the bosses' own later), never X's weapon change */
@@ -1948,12 +2237,15 @@ void axl_frame(char *self, x_fn orig)
             if (shooting)
                 copy_fire(p);
         }
-        if (!dna_flies())
+        if (!dna_flies() && !giga_t)
             hover_before(p);
         if (dna_boss && !dna_pose && !LOCK(p))
             changed_input(p);
     } else {
-        shooting = hovering = adash_t = giga_t = roll_t = 0;
+        if (giga_t && giga_air)   /* (cut off in the air: X's own fall, not stuck) */
+            GRAVITY(p) = X_GRAVITY(p);
+        giga_shake_end();   /* (cut off in the barrage: the targets where they were) */
+        shooting = hovering = adash_t = giga_t = roll_t = giga_air = 0;
         fly_blocked = 0;
         dna_reset();
         if (on) {   /* (Axl not in his normal update - an item's refill, a cutscene: no X charge from a held shot,
