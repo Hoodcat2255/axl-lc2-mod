@@ -648,8 +648,10 @@ static int thrown(char *o)
 }
 
 /* enemy bullets with an attack box within r px of (x, y) are blocked: moved far below so their own off-screen
- * check frees them (their owners keep pointers to them), attack box off. Returns how many. */
-int block_enemy_shots(float x, float y, int r)
+ * check frees them (their owners keep pointers to them), their box with them. Returns how many. (The box pointer
+ * +0x78 is left alone: Yammark's stage's type 05 shot reads through it every frame - cleared, the game crashed at
+ * 0x020B5BA0 on the giga's clearing, user report 2026-11-10) */
+static int enemy_shots(float x, float y, int r, int clear)
 {
     char *o;
     int k, i, n = 0;
@@ -663,14 +665,27 @@ int block_enemy_shots(float x, float y, int r)
                 continue;
             if (k == 5 && !thrown(o))
                 continue;
+            if (!clear) {
+                n++;
+                continue;
+            }
             if (test_on)
                 test_log("enemy shot blocked: pool %d %p type %02x xy %.0f %.0f", k, o, O8(o, 9), PX(o), PY(o));
             PY(o) += 0x400;
-            *(void **)(o + 0x78) = 0;
             n++;
         }
     }
     return n;
+}
+
+int block_enemy_shots(float x, float y, int r)
+{
+    return enemy_shots(x, y, r, 1);
+}
+
+int count_enemy_shots(float x, float y, int r)   /* the same ones, left as they are (the test's eshots) */
+{
+    return enemy_shots(x, y, r, 0);
 }
 
 /* Ride-armor-like bosses (user request 2026-11-02: Turtloid, Shark, Sheldon changed - a press stops on top of them).

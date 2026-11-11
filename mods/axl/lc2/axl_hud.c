@@ -12,6 +12,9 @@
  * Made in X main (proj_spawn needs it), placed and shown after the unit pass (axl_menu.c move_hook: every frame,
  * also paused); made again when the game freed them (a stage load). Their palettes: HUD_LEVELS pairs (border, icon)
  * in a free run of CLUT slots, uploaded every frame shown, the slots' colours put back when the HUD goes.
+ *
+ * Off (AXL_NO_HUD, user decision 2026-11-11: "스킬 아이콘 아예 없애버려"): no buttons are made or shown. The HUD
+ * texture stays, the giga pictures and Yammark's turned drones are drawn from it.
  */
 #include <windows.h>
 
@@ -19,6 +22,8 @@
 #include "axl_proj.h"
 #include "axl_data.h"      /* the game-derived tables (axl_data.bin) */
 #include "axl_test.h"
+
+#define AXL_NO_HUD   /* (the skill icons gone: see above) */
 
 #define O8(p, o) (*(volatile unsigned char *)((p) + (o)))
 #define O16(p, o) (*(volatile unsigned short *)((p) + (o)))
@@ -49,9 +54,12 @@ static void pal_give(void)
     pal_lo = -1;
 }
 
+static int form_was = -1;   /* Yammark's formation the HUD showed (-1: a new change) */
+
 static void hud_kill(void)
 {
     int s;
+    form_was = -1;
     for (s = 0; s < SK_N; s++) {
         if (cells[s] && proj_of(cells[s]))
             proj_kill(cells[s]);
@@ -66,7 +74,7 @@ static void hud_kill(void)
 void hud_frame(char *p)
 {
     int s;
-#ifdef AXL_NO_SKILLS   /* (no skill HUD in the test5 release: user decision 2026-11-04) */
+#if defined(AXL_NO_SKILLS) || defined(AXL_NO_HUD)   /* (no skill HUD: test5 2026-11-04, then for good 2026-11-11) */
     (void)p;
     (void)s;
     return;
@@ -88,15 +96,28 @@ void hud_frame(char *p)
     }
 }
 
+int hud_dash_on;   /* test (hud_dash): Yammark's dash button drawn on */
+
 /* the slot's state now: its frame step and palette level (on: a toggle's state, else -1) */
 static void slot_state(int s, int *step, int *level)
 {
     int left = skill_left(s), on = -1;
 
+    if (dna_boss != 1)
+        form_was = -1;
+    if (s == SK_SPECIAL && dna_boss == 1) {   /* Yammark's formation: a quarter of the border each */
+        if (yam_form != form_was)
+            flash_t[s] = form_was >= 0 ? HUD_FLASH_LEN : 0;
+        form_was = yam_form;
+        *step = HUD_STEPS * (yam_form + 1) / 4;
+        *level = flash_t[s] && flash_t[s]-- ? HUD_FLASH : HUD_READY;
+        left_was[s] = 0;
+        return;
+    }
     if (s == SK_SPECIAL && skill_defs[dna_boss][s].toggle)
         on = dna_alt != 0;
     else if (s == SK_DASH && dna_boss == 1)
-        on = axl_fly_fast;
+        on = hud_dash_on = axl_fly_fast;
     if (on >= 0) {
         *step = on ? HUD_STEPS : 0;
         *level = on ? HUD_READY : HUD_COOL;
@@ -123,7 +144,7 @@ void hud_late(int menu_open)
     static unsigned last;
     char *p = axl_p;
     int s, ran = axl_frames != last, show;
-#ifdef AXL_NO_SKILLS
+#if defined(AXL_NO_SKILLS) || defined(AXL_NO_HUD)
     (void)menu_open;
     (void)p;
     (void)s;

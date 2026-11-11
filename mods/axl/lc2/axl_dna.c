@@ -68,6 +68,7 @@ static unsigned drain_acc, fill_acc;
 static short atk_cur = -1;
 static u16 atk_n;
 static u8 look_i, look_d, look_s;
+int dna_look_code(void) { return look_s; }   /* test (axl_test.c look): 0 idle, 2 attack, 3 move, 4-7 motion */
 /* the fields the look replaced for the draw */
 static struct { char *p; s32 tex, pat; u16 pal; u8 frame; float x, y; int on; } saved;
 
@@ -427,14 +428,33 @@ static int pose_air;     /* the change started in the air: Axl hangs there until
 static float pose_y;
 int dna_weak_test = -1;   /* test (axl_test.c weakid): this object id counts as the weakness boss */
 
+int dna_hurt_raw, dna_hurt_extra, dna_hits;   /* test (axl_test.c hurt_*, dna_hits): damage taken while changed */
+static int taken_acc;
+
 static int weak_hit(char *p)
 {
-    int hit = HP(p) < last_hp, w = weak_of[dna_boss];
+    int hit = HP(p) < last_hp, w = weak_of[dna_boss], d = last_hp - HP(p), pct = boss_mods[dna_boss].taken_pct;
     char *b;
 
     last_hp = HP(p);
     if (!hit)
         return 0;
+    dna_hurt_raw += d;
+    dna_hits++;
+    if (pct != 100 && HP(p) > 0) {   /* the specialty's damage taken (boss_mods): the extra part, fractions carried;
+                                        * not below 1 (the game's own hit killed or it did not) */
+        int e;
+        taken_acc += d * (pct - 100);
+        e = taken_acc / 100;
+        taken_acc -= e * 100;
+        if (e > HP(p) - 1)
+            e = HP(p) - 1;
+        if (e > 0) {
+            HP(p) = (u8)(HP(p) - e);
+            dna_hurt_extra += e;
+        }
+        last_hp = HP(p);   /* (read as this hit's: not a new one next frame) */
+    }
     hurt_t = HURT_FRAMES;
     b = objs_find_id(dna_weak_test >= 0 ? dna_weak_test : boss_type[w]);
     if (test_on)
@@ -466,6 +486,17 @@ void axl_sound_stop(int id)
 {
     if (SE_MGR)
         SE_STOP(SE_MGR, 0, 1, id);
+}
+
+/* a voice on no object (as READY, axl_hook.c): on the player it went unheard (user report 2026-11-10, Yammark's
+ * "Formation!" - the requests reached the game) */
+void axl_voice(int id)
+{
+    if (!SE_MGR)
+        return;
+    SE_PLAY(SE_MGR, 0, 1, id, 0);
+    if (test_on)
+        test_log("voice %d", id);
 }
 
 void axl_sound(int id)
@@ -631,6 +662,7 @@ int dna_before(char *p, int special_new, int busy)
             dna_alt = 0;
             axl_sound(SND_CHANGE);
             last_hp = HP(p);
+            taken_acc = dna_hurt_raw = dna_hurt_extra = dna_hits = 0;   /* (the test's hurt_*: this change's) */
             axl_dash_cancel(p);
             pose_air = STATE(p) == 6 || STATE(p) == 7;
             pose_y = *(volatile float *)(p + 0x1C);
@@ -716,8 +748,12 @@ void dna_after(char *p, int fire, int fire_new, int alt_new)
     dna_t++;
     skill_tick();   /* (the special's and the dash's cooldowns, axl_skills.c: after this frame's moves_before) */
     dna_giga_tick(p);   /* (a giga attack under way, axl_dna_bosses.c) */
-    if (alt_new && !(dna_boss == 7 && dna_shell_away))   /* (Sheldon: no plates while his shell is thrown) */
-        dna_alt ^= 1;
+    if (alt_new && !(dna_boss == 7 && dna_shell_away)) {   /* (Sheldon: no plates while his shell is thrown) */
+        if (dna_boss == 1)
+            yam_next_form();   /* (his formations with their own motion - not the summon's: axl_dna_bosses.c) */
+        else
+            dna_alt ^= 1;
+    }
     mode = atk_mode[dna_boss];
     q = &dna_looks[dna_boss].atk;
     if (!q->n && mode == 1)
@@ -784,13 +820,22 @@ static int seq_len(const dna_seq *q)
 /* the boss's own motion for what Axl does (user request 2026-10-27: the jump / dash showed the standing loop):
  * flyers (Yammark, Heatnix, Mijinion) by their flight speed, the others by X's state (3 / 4 walk, 6 jump, 7 fall,
  * 8 land); 0 = none (standing / shooting). *code = its look_s value (4..7) */
+extern int axl_floor_walk;
 static const dna_seq *motion_seq(char *p, const dna_look_t *L, int *code)
 {
     int st = STATE(p), m = 0;
     s32 vy = *(volatile s32 *)(p + 0x40), vx = *(volatile s32 *)(p + 0x3C);
     const dna_seq *q;
 
-    if (dna_flies())
+    if (dna_boss == 1 && moves_yam_dash()) {   /* the dash (speeds 0, it moves him itself): the flight's look
+                                                   * that way - forward, up, down (user report 2026-11-10) */
+        int dy, dx = moves_yam_dash_dir(&dy);
+        m = dx ? 4 : dy < 0 ? 5 : 6;
+    } else if (dna_flies() && axl_floor_walk)   /* (walking on the floor, down held: X crouched, axl_x.c flight) */
+        m = 4;
+    else if (dna_flies() && st == 26)
+        m = 0;
+    else if (dna_flies())
         m = st == 3 || st == 4 ? 4 : st != 6 && st != 7 ? 0 : vx ? 4 : vy > 0 ? 5 : vy < 0 ? 6 : 0;   /* (Yammark's
                                                    * order: vx, then vy; walking on the floor: forward flight) */
     else
@@ -819,6 +864,46 @@ int dna_ghost(char *w)
         proj_of(w)->x += (O8(w, 0x29) & 0x40) ? -L->push[look_pose] : L->push[look_pose];
     }
     return 1;
+}
+
+/* Yammark's dash afterimages (user request 2026-11-09: X's and Zero's dash shape, green, not blinking): the boss's
+ * picture drawn with flat green palettes, 3 shades (newest brightest) x the boss's 4 palettes, in a free CLUT run
+ * taken while they are out and given back after. Returns the run's first slot (shade s: + 4 s), -1 none */
+#define GHOST_SLOTS 12
+static int gpal_slot = -1;
+static unsigned short gpal_orig[GHOST_SLOTS * 16];
+
+int dna_ghost_palette(int on)
+{
+    /* added to the screen as X's (user report 2026-11-11: opaque, they looked off): STP set and the objects' translucent
+     * flag (axl_moves.c yd_ghost_fn, byte 8 | 0x10 - the PS1's o[0] 0x10, its quads' ABE: additive). (Without the flag,
+     * STP colours were not seen: their dark greens, added, 2026-11-09 / 11.) (7, 22, 6), (4, 14, 4), (2, 7, 2) */
+    static const unsigned short green[3] = {0x9AC7, 0x91C4, 0x88E2};
+    unsigned short pal[GHOST_SLOTS * 16];
+    int s, i;
+
+    if (!CLUT_OWNER)
+        return -1;
+    if (!on) {
+        if (gpal_slot >= 0)
+            CLUT_UPLOAD(CLUT_OWNER, 0, gpal_slot, gpal_orig, GHOST_SLOTS);
+        gpal_slot = -1;
+        return -1;
+    }
+    if (gpal_slot < 0) {
+        s = clut_free_run(GHOST_SLOTS, dna_pal_slot, dna_pal_slot + 4);
+        if (s < 0)
+            return -1;
+        gpal_slot = s;
+        memcpy(gpal_orig, CLUT_SLOT_MEM(s), sizeof gpal_orig);
+        if (test_on)
+            test_log("dash afterimage palettes at slot %d", s);
+    }
+    for (s = 0; s < GHOST_SLOTS; s++)
+        for (i = 0; i < 16; i++)
+            pal[16 * s + i] = i ? green[s / 4] : 0;
+    CLUT_UPLOAD(CLUT_OWNER, 0, gpal_slot, pal, GHOST_SLOTS);
+    return gpal_slot;
 }
 
 int dna_test_nolook;   /* test (axl_test.c 'nolift look'): no look at all */

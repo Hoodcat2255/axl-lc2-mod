@@ -1,0 +1,40 @@
+# Flyers on the floor (user report 2026-11-10; Yammark only for now: the other flyers are unfinished, user 2026-11-10): down held walks on at X's walk
+# speed (X crouched, stopped), flying down-forward onto the floor keeps going, the dash button never starts X's own
+# ground dash (its afterimages)
+all_weapons
+seq
+wait free == 1 9000
+god on
+energy full
+ghost off
+log flyer_1
+goto 360 1080 4
+idle 40
+pset 14C 1
+press 4 S
+idle 70
+press 2 LEFT
+idle 4
+mark
+press 30 LEFT DOWN
+show dx xstate look afterimg
+expect look == 4 b1_walk_look
+expect dx <= -54 b1_down_walk_lo
+expect dx >= -62 b1_down_walk_hi
+press 10 UP
+idle 4
+mark
+press 20 DOWN LEFT
+press 20 LEFT DOWN
+show dx xstate look
+expect dx <= -30 b1_down_left_onto_floor
+idle 10
+press 4 A
+idle 2
+show xstate afterimg
+expect afterimg == 0 b1_no_x_afterimages
+expect xstate != 12 b1_no_x_dash
+idle 30
+press 2 C
+idle 60
+end

@@ -7,7 +7,8 @@ Drive flagged the zip): instead of the five archives, an xdelta3 (VCDIFF) patch 
 SHA-1 of the shipped and the patched files, apply_linux.sh (xdelta3, else apply_xdelta.py: python3 only, Steam Deck)
 and apply_windows.bat (xdelta3.exe the user gets; both find the game through Steam) from tools/dist_files/ - or Delta
 Patcher by hand. No executable goes in the package. Patches without secondary compression (-S none: plain VCDIFF).
---no-skills: the DLL built with AXL_NO_SKILLS (no cooldowns, skill HUD or boss giga attacks: test5, 2026-11-04).
+--no-skills: the DLL built with AXL_NO_SKILLS (no boss giga attacks: test5, 2026-11-04; the cooldowns are gone and the
+skill HUD is off in every build since 0.0.7).
 
 Builds first (lc2_build.py, lc2_hook.py --release: the DLL without the test harness / options file, lc2_selftest.py)
 and stops if any of it fails. The package mirrors the game folder: dinput8.dll and axl_data.bin (its tables, read
@@ -132,11 +133,9 @@ Running the patcher again is safe: archives already patched are left alone. Each
 DIST_FILES = os.path.join(HERE, 'dist_files')   # apply_linux.sh, apply_windows.bat (copied as they are)
 
 
-SKILLS_EN = """  - giga = its Giga Attack; bottom left: the 4 skills (shot / special / dash / giga), a dim icon with its border
-    filling = cooling down (special 3 s, dash 1.5-3 s, giga 20 s - ready again at every change)
+SKILLS_EN = """  - giga = its Giga Attack: needs the full giga gauge (the Giga Crush's, shared) and empties it
 """
-SKILLS_KO = """- 변신 중 기가 버튼 = 보스 기가어택. 왼쪽 아래 아이콘 4개(사격·특수·대시·기가): 어둡고 테두리가 차오르는 중이면
-  쿨타임(특수 3초, 대시 1.5~3초, 기가 20초, 변신할 때마다 기가는 바로 사용 가능).
+SKILLS_KO = """- 변신 중 기가 버튼 = 보스 기가어택. 기가크러쉬와 같은 기가 게이지가 꽉 차야 나가고, 쓰면 비워집니다.
 """
 
 

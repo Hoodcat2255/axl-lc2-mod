@@ -1,0 +1,253 @@
+# Yammark's kit (docs/skills_design.md 2.4, .omc/plans/yammark-kit.md; user decisions 2026-11-09): the specialty
+# (hit x1.25, 2.5 px/f flight), 6 options out at the first shot or special (with the formation voice), 4 formations on the special button (circle, wedge,
+# line abreast, column), the gatling (a shot every 3 frames, the sound every second one), the X-style dash (8 ways,
+# 6 px/f while held up to 30 frames, green afterimages), the giga (needs and empties the giga gauge shared with the Giga Crush; enemy shots cleared, the 3-armed spiral with him
+# invincible, the options' charge). 'goto' only before a change (changed, the harness's path does not move him:
+# yam_probe 2026-11-09); the dash blocks go right and back. The flight and dash blocks fire nothing (no options:
+# the intro's first enemy lives on for the hurt block, then the damage block - in the wedge, no option body hits).
+# The column bombs for 8 frames only (2 bombs: its carpet, a bomb every 4 frames, killed the shooter the giga block
+# waited on; since 2026-11-11 no shooter shows up there in time, so the clearing is only shown, not expected). The giga at the shooter near x 584 (its shots seen there by gs1, 2026-10-27: pool 5 at 584 1068).
+all_weapons
+hpwatch 7990
+seq
+wait free == 1 9000
+god on
+energy full
+ghost off
+goto 360 1080 4
+idle 40
+log flight_block
+pset 14C 1
+press 4 S
+idle 70
+press 10 UP
+idle 10
+mark
+press 20 UP
+show dy
+expect dy >= -52 b1_fly_25_lo
+expect dy <= -48 b1_fly_25_hi
+press 10 DOWN
+idle 30
+log dash_block
+press 2 RIGHT
+idle 10
+mark
+press 30 A RIGHT
+idle 10
+show dx dy
+expect dx >= 175 b1_dash30_lo
+expect dx <= 187 b1_dash30_hi
+press 2 LEFT
+idle 10
+mark
+press 40 A
+idle 10
+show dx
+expect dx >= -187 b1_dash_max_lo
+expect dx <= -175 b1_dash_max_hi
+press 2 RIGHT
+idle 10
+mark
+press 10 A
+idle 20
+show dx
+expect dx >= 55 b1_dash_release_lo
+expect dx <= 67 b1_dash_release_hi
+press 2 LEFT
+idle 10
+press 10 A
+idle 20
+press 2 RIGHT
+idle 10
+mark
+hold A
+press 5 RIGHT
+press 10 UP
+show yam_ghosts yam_dash
+expect yam_ghosts >= 2 b1_ghosts_lo
+expect yam_ghosts <= 3 b1_ghosts_hi
+log snap_dash
+snap
+release
+idle 20
+show dx dy yam_opts
+expect dx >= 25 b1_dash_turn_dx
+expect dy <= -50 b1_dash_turn_dy
+expect yam_opts == 0 b1_no_options_without_a_shot
+expect yam_voice == 0 b1_no_voice_without_a_shot
+press 2 C
+idle 60
+log heatnix_flight
+pset 14C 3
+press 4 S
+idle 70
+press 10 UP
+idle 10
+mark
+press 20 UP
+show dy
+expect dy >= -42 b3_fly_2_lo
+expect dy <= -38 b3_fly_2_hi
+press 2 C
+idle 60
+log hurt_block
+goto 360 1080 4
+idle 40
+pset 14C 1
+press 4 S
+idle 70
+show yam_opts enemy_near hp
+expect yam_opts == 0 b1_no_options_yet
+expect enemy_near == 1 b1_enemy_for_hurt
+expect hp >= 32 b1_hp_for_hurt
+god off
+hold RIGHT
+wait hurt_raw >= 1 600
+release
+idle 20
+show dna_hits hurt_raw hurt_extra hp
+expect dna_hits == 1 b1_one_hit_one_count
+hold RIGHT
+wait hurt_raw >= 16 1200
+release
+god on
+show hurt_raw hurt_extra hurt_pct hp dna_hits
+expect hurt_pct >= 120 b1_hurt_pct_lo
+expect hurt_pct <= 130 b1_hurt_pct_hi
+idle 20
+log damage_block
+idle 60
+press 6 LEFT
+idle 10
+press 2 RIGHT
+idle 10
+show yam_opts enemy_near
+expect enemy_near == 1 b1_enemy_for_damage
+press 2 S
+idle 10
+show yam_opts yam_voice yam_form
+expect yam_opts == 6 b1_special_brings_options
+expect yam_voice == 34 b1_special_says_guard
+expect yam_form == 0 b1_special_no_step_then
+press 2 S
+idle 45
+expect yam_voice == 35 b1_step_says_delta
+press 2 S
+idle 45
+expect yam_form == 2 b1_line_for_damage
+press 4 X
+idle 20
+show yam_opts last_dmg
+expect yam_opts == 6 b1_six_options
+mark
+press 30 X
+idle 4
+show last_dmg shots
+expect last_dmg == 3 b1_volley_buster_damage
+expect shots >= 12 b1_line_volley
+log snap_line
+press 20 X
+snap
+idle 30
+press 2 S
+idle 45
+expect yam_form == 3 b1_form_column
+press 30 LEFT
+press 2 RIGHT
+press 8 X
+log snap_column
+snap
+idle 30
+press 2 S
+idle 45
+expect yam_form == 0 b1_form_circle_again
+log gatling_block
+press 2 RIGHT
+idle 10
+mark
+press 60 X
+show shots yam_snd proj_live proj_fails
+expect shots >= 19 b1_gatling_lo
+expect shots <= 21 b1_gatling_hi
+expect yam_snd >= 9 b1_sound_lo
+expect yam_snd <= 11 b1_sound_hi
+log snap_circle
+press 20 X
+snap
+idle 40
+show proj_live proj_fails
+expect proj_fails == 0 b1_no_spawn_fails
+log wedge_block
+press 2 S
+idle 45
+expect yam_form == 1 b1_form_wedge
+press 2 RIGHT
+idle 10
+press 12 X
+show yam_charging
+expect yam_charging >= 1 b1_wedge_charges
+log snap_wedge
+snap
+idle 40
+show yam_charging
+expect yam_charging == 0 b1_wedge_back
+press 2 C
+idle 60
+show dna_shots
+expect dna_shots == 0 b1_gone_with_change
+log shot_wakes_block
+pset 14C 1
+press 4 S
+idle 70
+show yam_opts yam_voice yam_form
+expect yam_opts == 0 b1_no_options_again
+press 1 X
+idle 5
+show yam_opts yam_voice
+expect yam_opts == 6 b1_shot_brings_options
+expect yam_voice == 35 b1_shot_says_delta
+press 2 C
+idle 60
+log giga_block
+goto 480 1000 4
+idle 20
+pset 14C 1
+press 4 S
+idle 70
+idle 60
+show eshots enemy_near
+pset 1A0 0
+pset 1A1 0
+press 2 V
+idle 10
+show hurtbox p_1A0
+expect hurtbox == 1 b1_giga_needs_full_gauge
+pset 1A0 40
+pset 1A1 2
+press 2 V
+idle 1
+show eb_cleared p_1A0
+expect p_1A0 == 0 b1_giga_empties_gauge
+idle 29
+show hurtbox
+expect hurtbox == 0 b1_giga_invincible
+log snap_giga_spiral
+snap
+mark
+press 30 RIGHT
+show dx
+expect dx > 20 b1_giga_still_flying
+idle 62
+log snap_giga_charge
+snap
+idle 80
+show hurtbox giga_dmg proj_live proj_fails
+expect hurtbox == 1 b1_giga_vulnerable_again
+expect giga_dmg > 0 b1_giga_damage
+expect proj_fails == 0 b1_giga_no_spawn_fails
+press 2 C
+idle 60
+show dna_shots
+expect dna_shots == 0 b1_giga_gone_with_change
+end

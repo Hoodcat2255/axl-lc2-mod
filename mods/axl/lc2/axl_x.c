@@ -63,6 +63,9 @@ typedef int s32;
 #define ANIM_HOVER 202
 #define ANIM_WALK 8     /* X's walk loop */
 #define ST_CROUCH 26
+#define ST_DASH 12             /* X's ground dash */
+#define X_WALK 2.0f   /* px/f: X's walk (state 4) and his flight's sideways speed (measured 2026-11-10; 1.625 was
+                       * slower than both, user report) */
 #define ST_ULT_HOVER 33       /* the Ultimate armour's hover (armour 4) */
 #define C_WALLS 0x3           /* the wall bits 1 / 2 of the terrain / object contact flags (P+0xB0 / B1 / F0, PS1 +0x70) */
 #define ST_WALL_KICK 10        /* the kick off a wall (9 cling, 11 slide) */
@@ -1379,10 +1382,26 @@ static int hold_target(char *o)
            !(*(volatile unsigned *)(st + SAVE_PARTS_AT) & DNA_BIT(stage));
 }
 
+int axl_last_dmg = -1, axl_enemy_hits;   /* test (axl_test.c last_dmg): an enemy's last loss, the count of losses */
+
 void __fastcall axl_boss_hp_set(char *comp, void *edx, int v)
 {
     char *o = comp - 0x74;
     (void)edx;
+    {
+        int prev = *(volatile unsigned char *)(comp + 0x10), nv = (signed char)v < 0 ? 0 : (signed char)v;
+        if (o != axl_p && prev > (signed char)v) {   /* (Yammark's wedge charge: 1 less, axl_dna_bosses.c) */
+            int loss = prev - (signed char)v, less = dna_hit_loss(o, loss);
+            if (less != loss) {
+                v = prev - less;
+                nv = (signed char)v < 0 ? 0 : (signed char)v;
+            }
+        }
+        if (o != axl_p && prev > nv) {   /* (an overkill comes as 0 or less: counted as down to 0) */
+            axl_last_dmg = prev - nv;
+            axl_enemy_hits++;
+        }
+    }
     if ((signed char)v <= 0 && hold_target(o) && !copy_kills() && GetTickCount() - axl_on_tick < 250) {
         if (!hold_boss) {
             hold_boss = o;
@@ -1461,6 +1480,65 @@ static void puff_fn(char *w, proj *q)
     }
 }
 
+/* a blast: the game's own explosion (com00 by parts section 2 frames 2-17, 2 frames each; user report 2026-11-10:
+ * Yammark's bombs went off as the boss's last spark pictures, white bits). Its pictures use colours 1-15 of palette
+ * bit 0's slot; the game's explosion colours go to a free CLUT slot while a blast is out, as the puffs' greys */
+#define BOOM_F0 2
+#define BOOM_N 16
+#define BOOM_STEP 2
+static int boom_slot = -1;
+static unsigned short boom_orig[16];
+static unsigned boom_seen;
+
+/* the game's own explosion palette (fire and grey smoke: the CLUT slot 4 the game has when an enemy blows up,
+ * gdump 2026-11-10; user report: the red-to-white ramp looked unnatural) */
+static const unsigned short boom_pal[16] = {0x0000, 0xFFFF, 0xCBFF, 0x8FFF, 0x937E, 0x92DE, 0x95FE, 0x8978,
+                                            0x90F2, 0x846C, 0xD318, 0xC294, 0xB631, 0xADCE, 0xA16B, 0x9929};
+
+static void boom_palette(void)
+{
+    unsigned short *mem = PUFF_CLUT_OWNER ? (unsigned short *)((char *)PUFF_CLUT_OWNER + 0x1002C) : 0;
+    int on = boom_seen && frame_count - boom_seen <= 2;
+
+    if (!mem)
+        return;
+    if (on && boom_slot < 0) {
+        boom_slot = clut_free_run(1, dna_pal_slot, dna_pal_slot + 4);
+        if (boom_slot < 0)
+            return;
+        memcpy(boom_orig, mem + 16 * boom_slot, sizeof boom_orig);
+        if (test_on)
+            test_log("blast palette at slot %d", boom_slot);
+    }
+    if (on)
+        PUFF_CLUT_UP(PUFF_CLUT_OWNER, 0, boom_slot, boom_pal, 1);
+    else if (boom_slot >= 0) {
+        PUFF_CLUT_UP(PUFF_CLUT_OWNER, 0, boom_slot, boom_orig, 1);
+        boom_slot = -1;
+    }
+}
+
+/* the blast's behaviour (axl_dna_bosses.c: Yammark's bombs): its pictures, then gone */
+void axl_boom_fn(char *w, proj *q)
+{
+    int f = q->t / BOOM_STEP;
+    if (f >= BOOM_N) {
+        proj_kill(w);
+        return;
+    }
+    boom_seen = frame_count;
+    if (boom_slot < 0)
+        boom_palette();   /* (the slot before the first picture) */
+    if (boom_slot < 0) {
+        q->flags |= P_HIDDEN;   /* (no free slot: not drawn in another palette) */
+        return;
+    }
+    q->flags &= ~P_HIDDEN;
+    proj_pose_look(w, PUFF_TEX, PUFF_PAT, BOOM_F0 + f);
+    O16(w, 0x5E) = (unsigned short)boom_slot;
+    O8(w, 0x2A) = LAYER_FRONT_;
+}
+
 static void groggy_tick(char *b, int hp)
 {
     static unsigned last;
@@ -1513,6 +1591,7 @@ static void dna_watch_copy(char *p)
         copy_gone = axl_frames;
     }
     puff_palette();
+    boom_palette();
     if (!st || !b) {
         boss = 0;
         hold_boss = 0;
@@ -2020,7 +2099,6 @@ static void giga_after(char *self, char *p)
  * horizontal one stays X's air control; X's default gravity is 0 meanwhile so walking off a ledge keeps him up. */
 #define START_FALL ((x_method_t)0x0253DB60)   /* PS1 FUN_8003aff4: fall anim, speeds 0, gravity = default, state 7 */
 #define FLY_SPEED 0x20000
-#define FLY_FAST 0x40000
 #define C_FLOOR 0x8
 static s32 x_gravity_saved;
 
@@ -2108,6 +2186,8 @@ static void changed_states(char *self, char *p)
 }
 
 int axl_fly_fast;
+int axl_floor_walk;   /* a flyer walking with X's state undone (axl_dna.c motion_seq: the walk's look - X crouches
+                       * again in the move pass before the look) */
 
 static void flight(char *self, char *p)
 {
@@ -2117,7 +2197,7 @@ static void flight(char *self, char *p)
 
     if (X_GRAVITY(p))
         x_gravity_saved = X_GRAVITY(p);
-    axl_fly_fast = 0;
+    axl_fly_fast = axl_floor_walk = 0;
     if (!dna_flies() || dna_pose) {
         if (!X_GRAVITY(p) && x_gravity_saved) {   /* the change ended: X falls again */
             X_GRAVITY(p) = x_gravity_saved;
@@ -2129,12 +2209,43 @@ static void flight(char *self, char *p)
     HELD(p) = held & ~B_JUMP;
     NEWP(p) &= ~(B_JUMP | B_DASH);
     HELD(p) &= ~B_DASH;
-    sp = (held & B_DASH) && dna_boss == 1 ? FLY_FAST : FLY_SPEED;   /* (Heatnix / Mijinion: the dash is a move) */
-    axl_fly_fast = sp == FLY_FAST;   /* (the HUD's dash button on, axl_hud.c) */
+    sp = boss_mods[dna_boss < 9 ? dna_boss : 0].fly;   /* (the specialty's flight speed, axl_skills.c) */
+    axl_fly_fast = dna_boss == 1 && moves_yam_dash();   /* (the HUD's dash button on, axl_hud.c) */
     if (LOCK(p)) {                                /* a cutscene: fall to the floor like X */
         X_GRAVITY(p) = x_gravity_saved;
         if (in_air(st) && !GRAVITY(p))
             GRAVITY(p) = x_gravity_saved;
+        return;
+    }
+    /* on the floor X's own crouch (down held) and ground dash get in although their buttons are taken off before
+     * X's update (X reads them where the held bits do not reach): every flyer (user report 2026-11-10: down-forward
+     * onto the floor he stopped or crept at 0.5 px/f; on the floor the dash showed X's dash afterimages). Undone after
+     * X's update: standing, or walking at X's walk speed from where he was */
+    /* (and X's walk start, state 3: about 6 frames at 0.5 px/f before his walk - a flyer goes at once, as in the
+     * air: user report 2026-11-10, slow off the mark after landing) */
+    if (st == ST_CROUCH || st == ST_DASH || st == 3 || ((held & B_DOWN) && st == 4)) {
+        int lr = held & (B_LEFT | B_RIGHT), dir = lr == B_RIGHT ? 1 : lr == B_LEFT ? -1 : 0;
+        int was = st;
+        *(volatile float *)(p + 0x14) = fly_last_x;
+        VX(p) = 0;
+        DASH_JUMP(p) = 0;
+        AFTERIMAGE(p) = 0;
+        O8(p, 0x0D) = dir ? 4 : 2;
+        O8(p, 0x0E) = 0;
+        if (was == ST_CROUCH || was == ST_DASH || was == 3 || !dir)
+            set_anim(p, dir ? ANIM_WALK : ANIM_IDLE);
+        if (dir) {
+            if (dir > 0)
+                FACING(p) |= FACE_RIGHT;
+            else
+                FACING(p) &= ~FACE_RIGHT;
+            moves_step(p, dir * X_WALK);
+            axl_floor_walk = 1;
+        }
+        if (!X_GRAVITY(p) && x_gravity_saved)
+            X_GRAVITY(p) = x_gravity_saved;
+        if (test_on && was != 3 && was != 4)
+            test_log("flyer: X's state %d undone (%s)", was, dir ? "walking" : "standing");
         return;
     }
     if (on_ground(st) && !(held & B_UP)) {       /* on the ground he walks as X, gravity and all: down a slope
@@ -2159,7 +2270,7 @@ static void flight(char *self, char *p)
     }
     if (in_air(st)) {
         GRAVITY(p) = 0;
-        VY(p) = (held & B_UP) ? sp : (held & B_DOWN) ? -sp : 0;
+        VY(p) = moves_yam_dash() ? 0 : (held & B_UP) ? sp : (held & B_DOWN) ? -sp : 0;   /* (the dash moves him itself) */
     }
 }
 
@@ -2262,14 +2373,17 @@ void axl_frame(char *self, x_fn orig)
             int dash_new = (NEWP(p) & B_DASH) != 0, dash_held = (HELD(p) & B_DASH) != 0;
             HELD(p) &= ~B_GIGA;
             NEWP(p) &= ~B_GIGA;
-            if (dna_boss != 1) {  /* the dash is the boss's move (Yammark: fast flight) */
-                HELD(p) &= ~B_DASH;
-                NEWP(p) &= ~B_DASH;
-            }
+            HELD(p) &= ~B_DASH;   /* the dash is the boss's move (Yammark's too: his X-style dash, axl_moves.c) */
+            NEWP(p) &= ~B_DASH;
 #ifdef AXL_NO_SKILLS   /* (the test5 release: the giga button stays empty while changed, as in test4) */
             giga_new = 0;
 #endif
             if (dna_giga_start(p, giga_new && !LOCK(p))) {   /* a giga attack holds him (axl_dna_bosses.c) */
+                HELD(p) = 0;
+                NEWP(p) = 0;
+                dash_new = dash_held = alt_new = 0;
+            }
+            if (dna_yam_hold()) {   /* Yammark's change of formation: he stops (user decision 2026-11-10) */
                 HELD(p) = 0;
                 NEWP(p) = 0;
                 dash_new = dash_held = alt_new = 0;
@@ -2477,7 +2591,7 @@ void axl_box(char *self)
         BOX_PTR(p) = X_BOXES + 8 * b;
     else if (f >= 228 && !BOX_PTR(p) && (b = X_BOX_INDEX[box_from[f - 228]]) != 0)
         BOX_PTR(p) = X_BOXES + 8 * b;
-    if (moves_invincible() || (roll_t && ROLL_LEN - roll_t < ROLL_MOVE))
+    if (moves_invincible() || dna_giga_invincible() || (roll_t && ROLL_LEN - roll_t < ROLL_MOVE))
         BOX_PTR(p) = 0;      /* an invincible move (Shark's fin, Turtloid's shell): no hurt box */
     else if (dna_hurt_box() && BOX_PTR(p))
         BOX_PTR(p) = dna_hurt_box();   /* changed: the boss's size */

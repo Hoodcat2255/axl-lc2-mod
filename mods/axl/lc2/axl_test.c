@@ -363,7 +363,11 @@ static const char *const OPS[] = {"==", "!=", "<", ">", "<=", ">="};
 
 static const char *const NAMES[] = {"stage", "area", "state", "checkpoint", "lives", "hp", "anim", "free", "px", "py",
                                     "boss_alive", "boss_hp", "steps", "embedded", "dx", "dy", "rise", "shots", "dna_shots",
-                                    "cd_shot", "cd_special", "cd_dash", "cd_giga", "hud", "flash_dir", "bullets", "flash_off"};
+                                    "cd_shot", "cd_special", "cd_dash", "cd_giga", "hud", "changed", "flash_dir", "bullets", "flash_off",
+                                    /* the kits (axl_dna_bosses.c dna_value) */
+                                    "proj_live", "proj_fails", "hurt_raw", "hurt_extra", "hurt_pct", "dna_hits", "last_dmg",
+                                    "enemy_near", "yam_opts", "yam_snd", "yam_form", "yam_voice", "yam_capped", "yam_blasts", "yam_charging", "look", "xstate", "afterimg", "yam_dash", "yam_ghosts", "hud_dash",
+                                    "eb_cleared", "giga_dmg", "hurtbox", "eshots"};
 
 static int parse_cond(char **tok, int n, cond_t *c)
 {
@@ -731,6 +735,10 @@ static int value_of(const char *name, int *ok)
         return objs_boss() != 0;
     if (!strcmp(name, "boss_hp"))
         return (b = objs_boss()) ? O8B(b, 0x84) : -1;   /* (a byte, PS1 +0x5C; +0x85 is something else) */
+    if (!strcmp(name, "changed")) {   /* the boss he is changed into (0: Axl) */
+        extern unsigned char dna_boss;
+        return dna_boss;
+    }
     if (!strcmp(name, "hud")) {   /* the skill HUD's buttons drawn now, bit = slot (axl_hud.c) */
         extern int hud_shown;
         return hud_shown;
@@ -794,6 +802,12 @@ static int value_of(const char *name, int *ok)
             int b = proj_terrain(p) & 0xF;
             return (b & 3) == 3 || (b & 0xC) == 0xC;
         }
+    }
+    {   /* the changed bosses' kits (axl_dna_bosses.c: hurt_*, last_dmg, proj_*, yam_*, ...) */
+        int dna_value(const char *name, int *ok);
+        int v = dna_value(name, ok);
+        if (*ok)
+            return v;
     }
     *ok = 0;
     return 0;
@@ -1231,6 +1245,10 @@ static void seq_frame(void)
                 mark_top = mark_y = *(volatile float *)(axl_p + 0x1C);
                 mark_shots = proj_made;
                 mark_bullets = axl_bullets;
+                {
+                    void dna_mark(void);   /* (axl_dna_bosses.c: the kits' counts from here) */
+                    dna_mark();
+                }
             }
             break;
         case S_UNCHANGE: {

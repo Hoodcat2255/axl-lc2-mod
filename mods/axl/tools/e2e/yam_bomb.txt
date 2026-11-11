@@ -1,0 +1,42 @@
+# The column's bombs (user request 2026-11-10: faster, more; the blast as the game's own explosion, com00) onto the
+# intro's first enemy: two go off on the way over it, snaps of the blasts
+all_weapons
+seq
+wait free == 1 9000
+god on
+energy full
+goto 250 1080 4
+idle 40
+pset 14C 1
+press 4 S
+idle 70
+press 2 S
+idle 10
+press 2 S
+idle 10
+press 2 S
+idle 10
+show yam_form
+press 4 X
+idle 20
+press 34 UP
+hold RIGHT
+wait yam_blasts >= 1 200
+release
+expect yam_blasts >= 1 b1_bomb_went_off
+idle 2
+snap
+idle 4
+snap
+idle 4
+snap
+idle 6
+snap
+hold LEFT
+wait yam_blasts >= 2 200
+release
+idle 3
+snap
+idle 6
+snap
+end

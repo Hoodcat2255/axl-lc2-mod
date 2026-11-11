@@ -15,8 +15,8 @@
 
 #define AXL_DATA_FILE "axl_data.bin"
 #define AXL_DATA_MAGIC 0x444C5841u   /* "AXLD" */
-#define AXL_DATA_VERSION 3           /* + 1 at every layout change */
-#define AXL_DATA_SIZE 44008          /* sizeof(axl_data_t): the packer and the DLL agree on the layout */
+#define AXL_DATA_VERSION 7           /* + 1 at every layout change */
+#define AXL_DATA_SIZE 44044          /* sizeof(axl_data_t): the packer and the DLL agree on the layout */
 
 /* ---- the mod's own constants (the generated headers repeat them: a mismatch stops the packer) ---- */
 #define DNA_SEQ_MAX 96
@@ -85,7 +85,8 @@ typedef struct {
     unsigned short menu_pals[N_BOSSES * MENU_PALS][16];
     unsigned short dna_pals[N_BOSSES][64];
     /* axl_hud_looks.h (lc2_dna.py hud_header) */
-    int hud_tex_index, hud_pat, giga_ball, giga_ball_n, giga_gather, giga_gather_n, giga_orb, giga_orb_n;
+    int hud_tex_index, hud_pat, giga_ball, giga_ball_n, giga_gather, giga_gather_n, giga_orb, giga_orb_n, giga_jet, giga_jet_r, giga_jet_n, giga_form, giga_form_n, giga_opt_rot,
+        giga_opt_rot_n, giga_jet_rot, giga_jet_rot_n;
     unsigned short hud_pals[N_BOSSES][2 * HUD_LEVELS][16];
     /* axl_dna_looks.h: the turned muzzle flash (lc2_dna.flash_looks) */
     int flash_tex_index, flash_pat;
@@ -170,6 +171,15 @@ int axl_data_load(void);   /* 1 = axl_data.bin read and checked */
 #define GIGA_GATHER_N (axl_d.giga_gather_n)
 #define GIGA_ORB (axl_d.giga_orb)
 #define GIGA_ORB_N (axl_d.giga_orb_n)
+#define GIGA_JET (axl_d.giga_jet)
+#define GIGA_JET_R (axl_d.giga_jet_r)
+#define GIGA_JET_N (axl_d.giga_jet_n)
+#define GIGA_FORM (axl_d.giga_form)
+#define GIGA_FORM_N (axl_d.giga_form_n)
+#define GIGA_OPT_ROT (axl_d.giga_opt_rot)
+#define GIGA_OPT_ROT_N (axl_d.giga_opt_rot_n)
+#define GIGA_JET_ROT (axl_d.giga_jet_rot)
+#define GIGA_JET_ROT_N (axl_d.giga_jet_rot_n)
 #define hud_pals (axl_d.hud_pals)
 #define FLASH_TEX_INDEX (axl_d.flash_tex_index)
 #define FLASH_PAT (axl_d.flash_pat)

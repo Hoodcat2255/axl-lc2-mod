@@ -749,9 +749,21 @@ HUD_LEVELS = ('cool', 'ready', 'flash')   # palette pairs: cooling down (icon di
 # a boss, 256 frames), so they go into the HUD texture too, as frames HUD_FRAMES * 4 + i of the boss's HUD section,
 # drawn in the boss's own 4 palettes (the parts' palette layer as in his art; the projectile's slot = dna_pal_slot).
 # Per boss: (NAME, parts table, [boss pictures], crop radius or 0) -> GIGA_NAME (its first frame) and GIGA_NAME_N
-GIGA_PICS = {5: (('BALL', 1, (21, 22, 23), 47),),          # Scaravich's rock ball at full size (size 4: about 96 px)
+GIGA_PICS = {1: (('JET', 0, (77, 78, 79, 80, 81, 82, 83), 0),
+                 ('FORM', 0, tuple(range(43, 62)), 0)),   # the change of formation (user request 2026-11-10): the
+             # light gathering 43-48, the flash 49-51, the ring 52-61   # Yammark's jet streak (the wedge drones' charge trail,
+             # user request 2026-11-10: all 7 pictures - the FX frames end at 256, this section has room)
+             5: (('BALL', 1, (21, 22, 23), 47),),          # Scaravich's rock ball at full size (size 4: about 96 px)
              8: (('GATHER', 0, (94, 95, 96, 97, 98, 99), 0),   # Mijinion's energy gathering (8 orbs closing in)
                  ('ORB', 0, (102, 103), 0))}                    # his small energy orb (the 8-way shot)
+GIGA_MIRROR = ('JET',)   # also drawn facing right: NAME_R, the pictures mirrored (these frames are drawn unmirrored)
+# Boss pictures turned toward GIGA_ROT_N directions (user request 2026-11-11: the wedge's drones charge nose first):
+# NAME + n * d + i = picture i (of n) for the flight at d * 360 / N degrees (0 = right, counter-clockwise on screen); the
+# pictures face left, so the rightward half is the mirrored ones turned (never upside down). Per boss: [(NAME, parts
+# table, boss pictures)]
+GIGA_ROT = {1: [('OPT_ROT', 0, (73,)),              # Yammark's dragonfly drone (FX OPT's first picture)
+                ('JET_ROT', 0, (77, 79, 81, 83))]}  # its jet streak (JET's every other picture: the tiles)
+GIGA_ROT_N = 16
 HUD_BACK = (44, 54, 92)                   # the icon's backing
 
 
@@ -950,8 +962,9 @@ def hud_pictures(fx_anims, bosses):
 
 
 def giga_pictures_hud():
-    """GIGA_PICS -> {k: [(name, [index image (16 * palette layer + colour) per picture])]}"""
+    """GIGA_PICS / GIGA_ROT -> {k: [(name, [index image (16 * palette layer + colour) per picture])]}"""
     import boss_look as L
+    from PIL import Image
     dat = open(F.DAT['us'], 'rb').read()
     out = {}
     for k, specs in GIGA_PICS.items():
@@ -969,6 +982,23 @@ def giga_pictures_hud():
                     img = np.where((yy - cy) ** 2 + (xx - cx) ** 2 <= r * r, img, 0)
                 imgs.append(img)
             out[k].append((name, imgs))
+            if name in GIGA_MIRROR:   # (x -> 2C - x: the same center)
+                out[k].append((name + '_R', [np.roll(i[:, ::-1], 1, axis=1) for i in imgs]))
+    for k, specs in GIGA_ROT.items():
+        b = L.Boss(dat, L.BOSSES[k])
+        for name, t, pics in specs:
+            b.pt = L.table(b, dat, L.BOSSES[k], t)
+            lefts = [b.compose(L.TABLE1 + f if t == 1 else f).astype(np.uint8) for f in pics]
+            imgs = []
+            for d in range(GIGA_ROT_N):
+                a = d * 360 / GIGA_ROT_N
+                for left in lefts:
+                    if 90 < a < 270:   # leftward: the picture as it is, turned
+                        im, turn = left, a - 180
+                    else:
+                        im, turn = np.roll(left[:, ::-1], 1, axis=1), a if a <= 90 else a - 360
+                    imgs.append(np.array(Image.fromarray(im).rotate(turn, Image.NEAREST, center=(L.C, L.C))))
+            out.setdefault(k, []).append((name, imgs))
     return out
 
 

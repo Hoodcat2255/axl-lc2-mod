@@ -206,7 +206,7 @@ int proj_live_dna(void)
 {
     int i, n = 0;
     for (i = 0; i < N_PROJ; i++)
-        n += projs[i].w && ((projs[i].id >= 1 && projs[i].id <= 8) || (projs[i].flags & P_GIGA));
+        n += projs[i].w && ((projs[i].id >= 1 && projs[i].id <= 8) || (projs[i].flags & (P_GIGA | P_DNA)));
     return n;
 }
 
@@ -214,7 +214,7 @@ void proj_kill_dna(void)
 {
     int i, n = 0;
     for (i = 0; i < N_PROJ; i++)
-        if (projs[i].w && ((projs[i].id >= 1 && projs[i].id <= 8) || (projs[i].flags & P_GIGA))) {
+        if (projs[i].w && ((projs[i].id >= 1 && projs[i].id <= 8) || (projs[i].flags & (P_GIGA | P_DNA)))) {
             proj_kill(projs[i].w);
             n++;
         }
@@ -250,6 +250,23 @@ void proj_allocated(char *o, int pool, int a, int b)
 }
 
 int proj_made;   /* our projectiles made so far (axl_test.c: shots) */
+int proj_fails;  /* spawns refused: no free entry, or the game's pool gave none (axl_test.c proj_fails) */
+
+int proj_free(void)   /* free entries of the table */
+{
+    int i, n = 0;
+    for (i = 0; i < N_PROJ; i++)
+        n += !projs[i].w;
+    return n;
+}
+
+int proj_count(int flag)   /* live projectiles with that flag */
+{
+    int i, n = 0;
+    for (i = 0; i < N_PROJ; i++)
+        n += projs[i].w && (projs[i].flags & flag);
+    return n;
+}
 
 char *proj_spawn(int id, float x, float y, int vx, int vy, int right, int life, proj_fn fn, int flags)
 {
@@ -267,8 +284,10 @@ char *proj_spawn(int id, float x, float y, int vx, int vy, int right, int life, 
             q = &projs[i];
             break;
         }
-    if (!q)
+    if (!q) {
+        proj_fails++;
         return 0;
+    }
     memset(q, 0, sizeof *q);
     q->id = (unsigned char)id;
     q->x = x;
@@ -300,6 +319,7 @@ char *proj_spawn(int id, float x, float y, int vx, int vy, int right, int life, 
         proj_made++;   /* (test: the scenarios' 'shots') */
     if (!q->w) {
         memset(q, 0, sizeof *q);
+        proj_fails++;
         return 0;
     }
     return q->w;

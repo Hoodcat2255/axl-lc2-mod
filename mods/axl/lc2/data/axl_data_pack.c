@@ -118,6 +118,15 @@ int main(int argc, char **argv)
     d.giga_gather_n = GIGA_GATHER_N;
     d.giga_orb = GIGA_ORB;
     d.giga_orb_n = GIGA_ORB_N;
+    d.giga_jet = GIGA_JET;
+    d.giga_jet_r = GIGA_JET_R;
+    d.giga_jet_n = GIGA_JET_N;
+    d.giga_form = GIGA_FORM;
+    d.giga_form_n = GIGA_FORM_N;
+    d.giga_opt_rot = GIGA_OPT_ROT;
+    d.giga_opt_rot_n = GIGA_OPT_ROT_N;
+    d.giga_jet_rot = GIGA_JET_ROT;
+    d.giga_jet_rot_n = GIGA_JET_ROT_N;
     SAME(hud_pals, hud_pals);
     d.flash_tex_index = FLASH_TEX_INDEX;
     d.flash_pat = FLASH_PAT;

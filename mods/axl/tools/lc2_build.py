@@ -500,6 +500,27 @@ BOSS_SOUNDS = {
     25: ('em32', 'st05_b_PG00_ID01'),   # Scaravich kick (0x35)
     26: ('em32', 'st05_b_PG00_ID02'),   # Scaravich ball lands (0x36)
 }
+# Yammark's formation voices (user requests 2026-11-10/11): "Formation" + the formation's name, one wave each, played
+# when the change starts (axl_dna_bosses.c y_form_tick). His clips (em31 st01_b PG02, by ear / whisper): ID07
+# "Formation!", ID08 "Guard!", ID09 "Wing!", ID10 "Final!". The parts decoded, joined and encoded again at 48 kHz
+# (adpcm_wave, as READY: the waves' blocks joined as they were played low and slow in the game, user report
+# 2026-11-10). A part ending in .wav is a file of sound/ (absent: "Formation!" alone; a tuple of parts: the first there). Slots of pl00 nothing plays
+# (a long session's log: 19 was played, so not it), each checked by recording the game (e2e zz_yam_voice, 2026-11-11):
+# 24 / 35 / 17 right (16 too, the giga's: recorded 2026-11-11, its whole wave matched at speed 1 where the log put it); 36 / 37 (program 4) silent, as a renamed spare record of the bank with a new wave entry; 34
+# played 4 semitones low (a 2000 Hz tone came out at 1588 Hz, 0.794 = 2^(-4/12): the game's own setting for X's
+# sound there, its bank records the same as 24's), so its wave is made 4 semitones higher and faster beforehand (the
+# last field: the speed it is made at).
+YAM_VOICES = (
+    (34, ('st01_b_PG02_ID07', 'st01_b_PG02_ID08'), 2 ** (4 / 12)),   # circle: "Formation... Guard!"
+    (35, ('st01_b_PG02_ID07', ('yam_delta.wav', 'st01_b_PG02_ID09')), 1),   # wedge: "Formation... Delta!" (the
+                                                                     # user's file, user request 2026-11-11; without
+                                                                     # it his "Wing!")
+    (17, ('st01_b_PG02_ID07', 'yam_line.wav'), 1),                   # line abreast: "Formation... Line!" (the user's
+                                                                     # file, local only)
+    (24, ('st01_b_PG02_ID07', 'st01_b_PG02_ID10'), 1),               # column: "Formation... Final!"
+    (16, ('st01_b_PG02_ID07', ('yam_spiral.wav', 'st01_b_PG02_ID10')), 1),   # the giga: "Formation... Spiral!" (the
+                                                                     # user's file, user request 2026-11-11)
+)
 CHANGE_SOUND = (27, ('concat', ['41_a_copy_shot', '33_a_hensin']))
 # the copy shot's charge (user request 2026-10-27: X's charge sound): X's charge loop (its request 7, 1.35 s, the tail
 # looped; X's code stops request 7 while X is not charging) copied to a free special-weapon slot, request 29
@@ -534,7 +555,7 @@ def request_wave(arc, rid):
 def sound_entries(arc):
     """every wave entry put_sounds writes"""
     out = {'X6\\sound\\' + t for t in AXL_SOUNDS}
-    out |= {request_wave(arc, r) for r in list(BOSS_SOUNDS) + [CHANGE_SOUND[0], CHARGE_SOUND[0], HOVER_SOUND[0],
+    out |= {request_wave(arc, r) for r in list(BOSS_SOUNDS) + [r for r, *_ in YAM_VOICES] + [CHANGE_SOUND[0], CHARGE_SOUND[0], HOVER_SOUND[0],
                                                            READY_SOUND[0], IKUZO_SOUND[0],
                                                            SIREN_SOUND[0]]}
     return out
@@ -621,7 +642,11 @@ def file_sound(name, gain, trim, secs, old):
                            'silenceremove=start_periods=1:start_threshold=-45dB,areverse,' if trim else '') +
                           ('atrim=0:%g,' % secs if secs else '') + 'volume=%ddB,alimiter=limit=0.8' % gain,
                           '-ac', '1', '-ar', '48000', '-f', 's16le', '-'], check=True, capture_output=True).stdout
-    x = np.frombuffer(pcm, '<i2')
+    return adpcm_wave(np.frombuffer(pcm, '<i2'), old)
+
+
+def adpcm_wave(x, old):
+    """the samples x (int16, mono, 48 kHz) as the game's MS-ADPCM wave, the old wave's other chunks kept"""
     x = np.concatenate([x, np.zeros(-len(x) % 128, '<i2')])
     ch = dict(riff_chunks(old))
     fmt = bytearray(ch[b'fmt '])
@@ -650,6 +675,31 @@ def put_sounds(arc):
         src = [e['name'] for e in boss[em].entries if e['hash'] == H_WAV and e['name'].endswith('\\' + wav)]
         assert len(src) == 1, (em, wav, src)
         arc.put(request_wave(arc, rid), H_WAV, boss[em].get(src[0], H_WAV))
+        done += 1
+    if 'em31' not in boss:
+        boss['em31'] = F.Arc(os.path.join(F.ROMPC, 'em31.arc'))
+    for rid, parts, speed in YAM_VOICES:
+        pcm = []
+        for w in parts:
+            if isinstance(w, tuple):               # (the first of them there)
+                w = next(a for a in w if not a.endswith('.wav') or os.path.isfile(os.path.join(SOUND_DIR, a)))
+            if w.endswith('.wav'):
+                path = os.path.join(SOUND_DIR, w)
+                if not os.path.isfile(path):
+                    continue
+                src = open(path, 'rb').read()
+            else:
+                n = [e['name'] for e in boss['em31'].entries if e['hash'] == H_WAV and e['name'].endswith('\\' + w)]
+                assert len(n) == 1, (w, n)
+                src = boss['em31'].get(n[0], H_WAV)
+            pcm.append(np.frombuffer(subprocess.run(['ffmpeg', '-v', 'error', '-i', '-', '-ac', '1', '-ar', '48000',
+                                                     '-f', 's16le', '-'], input=src, check=True,
+                                                    capture_output=True).stdout, '<i2'))
+        x = np.concatenate(pcm)
+        if speed != 1:                             # (played faster: resampled to fewer samples)
+            x = np.interp(np.arange(int(len(x) / speed)) * speed, np.arange(len(x)), x).astype('<i2')
+        n = request_wave(arc, rid)
+        arc.put(n, H_WAV, adpcm_wave(x, arc.get(n, H_WAV)))
         done += 1
     arc.put(request_wave(arc, CHARGE_SOUND[0]), H_WAV, arc.get('X6\\sound\\' + CHARGE_SOUND[1], H_WAV))
     arc.put(request_wave(arc, HOVER_SOUND[0]), H_WAV, x8_sound(HOVER_SOUND[1]))

@@ -34,9 +34,9 @@ log giga_b1_yammark
 pset 14C 1
 press 4 S
 idle 60
-show cd_giga hud
+show cd_giga changed
 expect cd_giga == 0 b1_giga_ready
-expect hud == 15 b1_hud_shown
+expect changed >= 1 b1_hud_shown
 press 2 RIGHT
 idle 2
 press 2 V
@@ -61,10 +61,10 @@ snap
 idle 60
 press 2 V
 idle 2
-show cd_giga hud
+show cd_giga changed
 expect cd_giga > 0 b1_giga_cooling
 expect cd_giga < 1150 b1_giga_refused
-expect hud == 15 b1_hud_cooling
+expect changed >= 1 b1_hud_cooling
 log snap_b1_hud_cooling
 snap
 idle 40
@@ -76,9 +76,9 @@ log giga_b2_wolfang
 pset 14C 2
 press 4 S
 idle 60
-show cd_giga hud
+show cd_giga changed
 expect cd_giga == 0 b2_giga_ready
-expect hud == 15 b2_hud_shown
+expect changed >= 1 b2_hud_shown
 press 2 RIGHT
 idle 2
 press 2 V
@@ -103,20 +103,20 @@ snap
 idle 60
 press 2 V
 idle 2
-show cd_giga hud
+show cd_giga changed
 expect cd_giga > 0 b2_giga_cooling
 expect cd_giga < 1150 b2_giga_refused
-expect hud == 15 b2_hud_cooling
+expect changed >= 1 b2_hud_cooling
 log snap_b2_hud_cooling
 snap
 idle 500
 log snap_b2_hud_half
-show cd_giga hud
-expect hud == 15 b2_hud_half_shown
+show cd_giga changed
+expect changed >= 1 b2_hud_half_shown
 snap
 wait cd_giga == 0 900
-show cd_giga hud
-expect hud == 15 b2_hud_ready_again
+show cd_giga changed
+expect changed >= 1 b2_hud_ready_again
 log snap_b2_hud_ready_again
 snap
 idle 40
@@ -128,9 +128,9 @@ log giga_b5_scaravich
 pset 14C 5
 press 4 S
 idle 60
-show cd_giga hud
+show cd_giga changed
 expect cd_giga == 0 b5_giga_ready
-expect hud == 15 b5_hud_shown
+expect changed >= 1 b5_hud_shown
 press 2 RIGHT
 idle 2
 press 2 V
@@ -155,10 +155,10 @@ snap
 idle 60
 press 2 V
 idle 2
-show cd_giga hud
+show cd_giga changed
 expect cd_giga > 0 b5_giga_cooling
 expect cd_giga < 1150 b5_giga_refused
-expect hud == 15 b5_hud_cooling
+expect changed >= 1 b5_hud_cooling
 log snap_b5_hud_cooling
 snap
 idle 40
@@ -170,9 +170,9 @@ log giga_b8_mijinion
 pset 14C 8
 press 4 S
 idle 60
-show cd_giga hud
+show cd_giga changed
 expect cd_giga == 0 b8_giga_ready
-expect hud == 15 b8_hud_shown
+expect changed >= 1 b8_hud_shown
 press 2 RIGHT
 idle 2
 press 2 V
@@ -197,10 +197,10 @@ snap
 idle 60
 press 2 V
 idle 2
-show cd_giga hud
+show cd_giga changed
 expect cd_giga > 0 b8_giga_cooling
 expect cd_giga < 1150 b8_giga_refused
-expect hud == 15 b8_hud_cooling
+expect changed >= 1 b8_hud_cooling
 log snap_b8_hud_cooling
 snap
 idle 40
@@ -212,9 +212,9 @@ log giga_b3_heatnix
 pset 14C 3
 press 4 S
 idle 60
-show cd_giga hud
+show cd_giga changed
 expect cd_giga == 0 b3_giga_ready
-expect hud == 15 b3_hud_shown
+expect changed >= 1 b3_hud_shown
 press 2 RIGHT
 idle 2
 press 2 V
@@ -239,10 +239,10 @@ snap
 idle 60
 press 2 V
 idle 2
-show cd_giga hud
+show cd_giga changed
 expect cd_giga > 0 b3_giga_cooling
 expect cd_giga < 1150 b3_giga_refused
-expect hud == 15 b3_hud_cooling
+expect changed >= 1 b3_hud_cooling
 log snap_b3_hud_cooling
 snap
 idle 40
@@ -254,9 +254,9 @@ log giga_b4_shark
 pset 14C 4
 press 4 S
 idle 60
-show cd_giga hud
+show cd_giga changed
 expect cd_giga == 0 b4_giga_ready
-expect hud == 15 b4_hud_shown
+expect changed >= 1 b4_hud_shown
 press 2 RIGHT
 idle 2
 press 2 V
@@ -281,10 +281,10 @@ snap
 idle 40
 press 2 V
 idle 2
-show cd_giga hud
+show cd_giga changed
 expect cd_giga > 0 b4_giga_cooling
 expect cd_giga < 1150 b4_giga_refused
-expect hud == 15 b4_hud_cooling
+expect changed >= 1 b4_hud_cooling
 log snap_b4_hud_cooling
 snap
 idle 40
@@ -296,9 +296,9 @@ log giga_b6_turtloid
 pset 14C 6
 press 4 S
 idle 60
-show cd_giga hud
+show cd_giga changed
 expect cd_giga == 0 b6_giga_ready
-expect hud == 15 b6_hud_shown
+expect changed >= 1 b6_hud_shown
 press 2 RIGHT
 idle 2
 press 2 V
@@ -323,10 +323,10 @@ snap
 idle 60
 press 2 V
 idle 2
-show cd_giga hud
+show cd_giga changed
 expect cd_giga > 0 b6_giga_cooling
 expect cd_giga < 1150 b6_giga_refused
-expect hud == 15 b6_hud_cooling
+expect changed >= 1 b6_hud_cooling
 log snap_b6_hud_cooling
 snap
 idle 40
@@ -338,9 +338,9 @@ log giga_b7_sheldon
 pset 14C 7
 press 4 S
 idle 60
-show cd_giga hud
+show cd_giga changed
 expect cd_giga == 0 b7_giga_ready
-expect hud == 15 b7_hud_shown
+expect changed >= 1 b7_hud_shown
 press 2 RIGHT
 idle 2
 press 2 V
@@ -368,10 +368,10 @@ snap
 idle 120
 press 2 V
 idle 2
-show cd_giga hud
+show cd_giga changed
 expect cd_giga > 0 b7_giga_cooling
 expect cd_giga < 1150 b7_giga_refused
-expect hud == 15 b7_hud_cooling
+expect changed >= 1 b7_hud_cooling
 log snap_b7_hud_cooling
 snap
 idle 40

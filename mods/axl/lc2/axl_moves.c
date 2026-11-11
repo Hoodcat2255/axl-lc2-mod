@@ -2,7 +2,8 @@
  * docs/boss_attacks.md): the dash button is the boss's move, the DNA button (giga) its second attack.
  *
  *   boss        dash (move)                                   DNA button (second attack)
- *   Yammark     fast flight (axl_x.c flight)                  option train (axl_dna_bosses.c, dna_alt)
+ *   Yammark     X-style dash: 8 ways 6 px/f while held, at most   the next formation of his 6 options
+ *               30 frames, afterimages (yd_*, below; 2026-11-09)  (axl_dna_bosses.c yam_next_form)
  *   Wolfang     ice-spike dash 6 px/f, spikes, body hit, afterimages  leap 20 degrees up 6 px/f, onto a wall
  *               walls and ceiling (wolf_*): a wall touched in the air holds him (jump: leap off, down: let go, DNA
  *               button: ice up and down the wall); up + jump: up to the ceiling, hanging (shot: 4 aimed shards, dash:
@@ -307,6 +308,133 @@ static void ghost(char *p)
     }
 }
 
+/* Yammark's dash (user decisions 2026-11-09: X's dash, 8 ways, no invincibility, no cooldown): the dash button
+ * starts it toward the held direction (none: where he faces) at YD_V px/f, on while held up to YD_LEN frames, the
+ * direction steered by the keys meanwhile; the shot and the special button stay his (moves_before returns 0). X's
+ * own left / right are taken off the held keys for its frames (his air control would add his speed), the move is
+ * done here after X's state code like Shark's leap (walls, ceiling, floor; up slopes on the ground). Afterimages
+ * (user request 2026-11-09: as X's and Zero's dash, green, not blinking - the game's own ones cannot draw the boss):
+ * his picture every YD_GHOST_GAP frames, YD_GHOST_LIFE frames each, in flat green (axl_dna.c dna_ghost_palette:
+ * fainter as they age). It ends at once with the change's leaving blink (dna_slide) */
+#define YD_LEN 30
+#define YD_V 6.0f
+#define YD_GHOST_GAP 4
+#define YD_GHOST_LIFE 12
+#define YD_GHOSTS 3
+static int yd_left, yd_n, yd_dx, yd_dy, yd_pal = -1;
+static char *yd_ghost[YD_GHOSTS];
+
+int moves_yam_dash(void)
+{
+    return yd_left > 0;
+}
+
+/* the dash's direction (axl_dna.c motion_seq: its look is the flight's that way, user report 2026-11-10) */
+int moves_yam_dash_dir(int *dy)
+{
+    *dy = yd_dy;
+    return yd_dx;
+}
+
+static void yd_ghost_fn(char *w, proj *q)
+{
+    *(volatile float *)(w + 0x1C) = q->y;
+    VX(w) = VY(w) = 0;
+    O8(w, 0x2A) = 3;                              /* behind him (user report 2026-11-09: they were drawn over him) */
+    O8(w, 8) |= 0x10;                             /* translucent (added to the screen, as X's: axl_dna.c
+                                                   * dna_ghost_palette) */
+    if (yd_pal >= 0)
+        *(volatile unsigned short *)(w + 0x5E) = (unsigned short)(yd_pal + 4 * (2 - q->t * 3 / YD_GHOST_LIFE));   /* (the darkest first, paler
+                                                   * as it goes: user request 2026-11-10) */
+    else if (q->t & 1)                            /* (no free palettes: the old blink) */
+        *(volatile float *)(w + 0x1C) = -10000.0f;
+}
+
+int moves_yam_ghosts(void)   /* test: the dash's afterimages up now */
+{
+    int i, n = 0;
+    for (i = 0; i < YD_GHOSTS; i++)
+        n += yd_ghost[i] && proj_of(yd_ghost[i]) && proj_of(yd_ghost[i])->fn == yd_ghost_fn;
+    return n;
+}
+
+/* every changed frame (moves_after): the afterimages' palettes while any is out */
+static void yd_ghosts_frame(void)
+{
+    yd_pal = dna_ghost_palette(dna_boss == 1 && moves_yam_ghosts() > 0);
+}
+
+static void yd_input(char *p, int dash_new, int dash_held)
+{
+    unsigned short h = *(volatile unsigned short *)(p + 0xC0);   /* (HELD: 1 right, 2 left, 4 up, 8 down) */
+    int dx = h & 1 ? 1 : h & 2 ? -1 : 0, dy = h & 4 ? -1 : h & 8 ? 1 : 0;
+
+    if (dash_new && !dna_leaving()) {
+        if (!dx && !dy)
+            dx = SX(p);
+        yd_left = YD_LEN;
+        yd_n = 0;
+        yd_dx = dx;
+        yd_dy = dy;
+        axl_sound(SND_DASH);
+        if (test_on)
+            test_log("yammark dash %d %d", dx, dy);
+    } else if (yd_left && !dash_held)
+        yd_left = 0;
+    if (!yd_left)
+        return;
+    if (dx || dy) {                               /* steered (the keys let go: on the way it went) */
+        yd_dx = dx;
+        yd_dy = dy;
+    }
+    *(volatile unsigned short *)(p + 0xC0) = h & ~3;
+    if (yd_dx)
+        O8(p, 0x29) = (O8(p, 0x29) & ~0x40) | (yd_dx > 0 ? 0x40 : 0);
+}
+
+static void yd_after(char *p)
+{
+    float v = yd_dx && yd_dy ? YD_V * 0.70710678f : YD_V;
+    int i;
+
+    if (dna_boss != 1 || dna_pose || dna_leaving()) {
+        yd_left = 0;
+        return;
+    }
+    VX(p) = 0;
+    if (yd_dx) {
+        if (on_ground(STATE(p)) && !yd_dy)
+            moves_step(p, yd_dx * v);
+        else {
+            PX(p) += yd_dx * v;
+            if (wall_ahead(p, yd_dx))
+                PX(p) -= yd_dx * v;
+        }
+    }
+    if (yd_dy) {
+        PY(p) += yd_dy * v;
+        if ((yd_dy < 0 && (proj_terrain(p) & 4)) || (yd_dy > 0 && (proj_terrain(p) & 8)))
+            PY(p) -= yd_dy * v;
+    }
+    if (yd_n++ % YD_GHOST_GAP == 0)
+        for (i = 0; i < YD_GHOSTS; i++)
+            if (!yd_ghost[i] || !proj_of(yd_ghost[i]) || proj_of(yd_ghost[i])->fn != yd_ghost_fn) {
+                char *w = proj_spawn(0, PX(p), PY(p), 0, 0, FACE(p), YD_GHOST_LIFE, yd_ghost_fn,
+                                     P_PIERCE | P_TOUGH | P_WALL | P_NOSCREEN);
+                yd_ghost[i] = 0;
+                if (w) {
+                    proj_nobox(w);
+                    if (dna_ghost(w))
+                        yd_ghost[i] = w;
+                    else
+                        proj_kill(w);
+                }
+                break;
+            }
+    if (--yd_left <= 0)
+        yd_left = 0;
+}
+
 static void clone_fn(char *w, proj *q)
 {
     char *e = find_target(PX(w), PY(w), 200);
@@ -607,6 +735,8 @@ void moves_reset(char *p)
     move_k = 0;
     seq_n = 0;
     seq_t = 0;
+    yd_left = 0;
+    yd_pal = dna_ghost_palette(0);   /* (the afterimages' palettes given back) */
     wolf_st = 0;
     wolf_body = 0;
     move_auto = 0;
@@ -700,6 +830,10 @@ int moves_before(char *p, int dash_new, int dash_held, int alt_new)
     }
     if (k != 2 && wolf_st)
         wolf_end(p);
+    if (k == 1)
+        yd_input(p, dash_new, dash_held);
+    else
+        yd_left = 0;
     if (k == 2 && wolf_input(p, dash_new, alt_new)) {
         if (seq_n && seq_t-- <= 0) {              /* (the ceiling shots, from the hang) */
             int vx, vy;
@@ -787,6 +921,9 @@ void moves_after(char *p)
         wolf_after(p);
         return;
     }
+    if (yd_left)
+        yd_after(p);
+    yd_ghosts_frame();
     if (!move_k || !dna_boss) {
         move_k = 0;
         return;

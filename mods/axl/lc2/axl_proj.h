@@ -1,5 +1,5 @@
 /* Axl's own projectiles on PC (axl_proj.c) */
-#define N_PROJ 48
+#define N_PROJ 64
 #define P_PIERCE 1    /* keep going after a hit */
 #define P_WALL 4      /* no terrain test: through walls */
 #define P_NOSCREEN 2  /* not freed off screen */
@@ -10,6 +10,7 @@
 #define P_GIGA 128    /* a giga attack's (axl_dna_bosses.c, charged damage ids): gone with the change as ids 1-8 */
 #define P_HIT1 256    /* with proj_nobox: X's shot's own box for its first frame (a buster hit where it is made: Axl's
                        * Giga Crush barrage - its damage came from these, user 2026-11-08) */
+#define P_DNA 512     /* a changed boss's shot with Axl's own damage id (Yammark's gatling, id 0): gone with the change */
 
 typedef struct proj proj;
 typedef void (*proj_fn)(char *w, proj *q);
@@ -22,6 +23,7 @@ struct proj {
     unsigned seen;
     const signed char *box;
     float x, y;
+    float tx, ty;         /* behaviour state: a spot (Yammark's giga charge) */
     int vx, vy;
     unsigned char id, right, anim, live, nobox, hitno, fx;
     int tex, pat;         /* (proj_pose_look: another texture / parts section than the FX one) */
@@ -44,4 +46,7 @@ void proj_frame(void);
 void proj_allocated(char *o, int pool, int a, int b);   /* axl_x.c axl_allocated */
 int proj_install(void);
 int proj_terrain(char *w);
+int proj_free(void);                             /* free entries of the table */
+int proj_count(int flag);                        /* live ones with that flag */
+extern int proj_fails;                           /* spawns refused so far */
 int proj_live_count(void);                       /* ours in X's shot count (axl_x.c lends them back) */                       /* terrain bits (1 / 2 wall, 4 ceiling, 8 floor) of w where it is now */

@@ -47,7 +47,9 @@ BOSSES = {
             atk=((10, 34), (10, 36), (6, 35), (6, 100), (6, 101), (1, 37)), atk_at=0,   # anim 5: option summon
             walk=((4, 3), (1, 26), (1, 28), (1, 28)), walk_loop=1,    # anim 2: forward flight
             jump=((1, 94), (1, 95), (1, 96)), jump_loop=0,            # anim 3: flying up
-            fall=((1, 97), (1, 98), (1, 99)), fall_loop=0),           # anim 4: flying down
+            fall=((1, 97), (1, 98), (1, 99)), fall_loop=0,            # anim 4: flying down
+            # PC: the change of formation (axl_dna_bosses.c, user request 2026-11-10): arms up, then pointing ahead
+            toss_pc=tuple((3, f) for f in (94, 95, 96, 97, 98, 99, 102, 103, 104, 105, 106, 107, 108, 109))),
     2: dict(name='Wolfang', dat=76, x0=512, base=0x140, pal=(5, 0x1300), scale=1,
             idle=((14, 30), (14, 31), (14, 32), (14, 31)),          # anim 0
             fire=(),

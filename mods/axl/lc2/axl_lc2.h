@@ -33,11 +33,13 @@ extern unsigned char dna_boss, dna_pose, dna_alt;
 extern int dna_toss_t, dna_shell_away;   /* axl_dna.c: a toss motion's frame (-1 none); Sheldon's shell out of his hands */
 int dna_before(char *p, int special_new, int busy);
 int dna_flies(void);
+int dna_ghost_palette(int on);         /* axl_dna.c: Yammark's green dash afterimages' slots (-1 none) */
 int dna_ghost(char *w);                /* axl_dna.c: w drawn as the changed boss's current picture */                  /* axl_x.c: the changed boss flies (Yammark, Heatnix, Mijinion) */
 void dna_after(char *p, int fire, int fire_new, int alt_new);
 void dna_cool_reset(void);
 int dna_cool_left(void);           /* axl_dna_bosses.c: the boss attack's cooldown left */
 void dna_yammark(char *p, int t, int fire, int fire_new);   /* axl_dna_bosses.c */
+int dna_hit_loss(char *e, int loss);   /* axl_dna_bosses.c: an enemy's loss to Yammark's wedge charge, made less */
 void dna_wolfang(char *p, int t, int fire, int fire_new);
 void dna_heatnix(char *p, int t, int fire, int fire_new);
 void dna_shark(char *p, int t, int fire, int fire_new);
@@ -45,6 +47,7 @@ void dna_scaravich(char *p, int t, int fire, int fire_new);
 void dna_turtloid(char *p, int t, int fire, int fire_new);
 void dna_sheldon(char *p, int t, int fire, int fire_new);
 void dna_mijinion(char *p, int t, int fire, int fire_new);
+int dna_giga_invincible(void);         /* axl_dna_bosses.c: Yammark's giga spiral */
 int dna_giga_start(char *p, int giga_new);   /* axl_dna_bosses.c: the giga button (changed); 1 = the giga holds him */
 void dna_giga_tick(char *p);           /* every changed frame (axl_dna.c dna_after) */
 int dna_giga_look(void);               /* the attack motion's frame to show during a giga, -1 none (dna_look) */
@@ -93,9 +96,20 @@ int skill_try(int s);                  /* ready: used (1), else refused (0) */
 void skill_tick(void);                 /* every changed frame (axl_dna.c dna_after) */
 void skill_reset(void);                /* the change starts / ends (moves_reset) */
 int skill_left(int s);                 /* frames until ready (SK_SHOT: the attack motion's time left) */
+/* axl_skills.c: the changed boss's specialty (user decision 2026-11-09, the flyers' kits: Yammark speed, Heatnix
+ * attack, Sheldon defence, Mijinion evasion): flight speed (fixed 16.16 px/f, vertical), the main shot's damage id,
+ * damage taken in percent */
+typedef struct { int fly; unsigned char shot_id, taken_pct; } boss_mod;
+extern const boss_mod boss_mods[9];
 int dna_shot_left(void);               /* axl_dna.c */
 int dna_leaving(void);                 /* axl_dna.c: the change's leaving blink runs */
-extern int axl_fly_fast;               /* axl_x.c: Yammark's fast flight (the dash button held) */
+int dna_yam_hold(void);                /* axl_dna_bosses.c: Yammark's change of formation holds him */
+void yam_next_form(void);              /* axl_dna_bosses.c: Yammark's next formation (the special button) */
+extern int yam_form;                   /* 0 circle, 1 wedge, 2 line abreast, 3 column */
+extern int axl_fly_fast;               /* axl_x.c: Yammark's dash on (the HUD) */
+int moves_yam_dash_dir(int *dy);         /* axl_moves.c: its direction (dx; *dy) */
+int moves_yam_dash(void);              /* axl_moves.c: Yammark's dash under way */
+int moves_yam_ghosts(void);
 /* axl_hud.c: the skill HUD (docs/skills_design.md) */
 void hud_frame(char *p);               /* X main: the buttons made while changed */
 void __fastcall axl_boss_hp_set(char *comp, void *edx, int v);   /* axl_x.c: the boss hold (axl_hook.c) */
@@ -110,6 +124,7 @@ extern int menu_change_to;
 int menu_frame(char *self, char *p);
 int menu_install(void);
 int block_enemy_shots(float x, float y, int r);
+int count_enemy_shots(float x, float y, int r);
 void dna_look(char *p, int fire);
 void dna_unlook(void);
 void dna_relook(char *p);
@@ -124,6 +139,7 @@ void dna_flash_tick(void);
 void *dna_hurt_box(void);                   /* the changed boss's hurt box object, 0 = X's */
 /* sounds of Axl's bank (FUN_023be620 kind 1; request ids, lc2_build.BOSS_SOUNDS / CHANGE_SOUND) */
 void axl_sound(int id);
+void axl_voice(int id);   /* axl_dna.c: a request on no object */
 void axl_sound_stop(int id);           /* axl_dna.c: stops a pl00 request's sound */
 extern int dna_pal_slot, menu_pal_lo;   /* our CLUT slots now (axl_dna.c clut_free_run) */
 int clut_free_run(int n, int lo, int hi);
@@ -149,6 +165,11 @@ int objs_targets(float x, float y, int rx, int ry, char **out, int max);   /* ax
                                    * with the Falcon armour, user 2026-11-08; 0x16 took 8, no flinch) */
 
 #define SND_YAM_SHOT 20
+#define SND_YAM_GUARD 34  /* pl00 requests 34 / 35 / 17 / 24: Yammark's "Formation... Guard / Delta (or Wing) / Line / Final!" */
+#define SND_YAM_WING 35   /* (lc2_build YAM_VOICES) */
+#define SND_YAM_LINE 17
+#define SND_YAM_FINAL 24
+#define SND_YAM_SPIRAL 16 /* the giga's "Formation... Spiral!" (without the user's file: "Final!") */
 #define SND_WOLF_THROW 21
 #define SND_WOLF_BREAK 22
 #define SND_HEAT_SHOT 23

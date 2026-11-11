@@ -60,6 +60,9 @@ static void aim_point(char *p, int range, int ahead, float *tx, float *ty)
 
 static int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 
+static int dna_giga_busy(void);   /* a giga of the changed boss under way (below) */
+extern int axl_enemy_hits;        /* axl_x.c: the enemies' hit-point losses so far */
+
 static int dead_dna(char *w, int k)
 {
     if (dna_boss != k) {
@@ -69,122 +72,497 @@ static int dead_dna(char *w, int k)
     return 0;
 }
 
-/* ---- 1 Commander Yammark: dragonfly options (boss sub-states 5/7 orbit fire, 9 train + bombs) ---------- */
-#define Y_OPTS 3
-#define Y_HIST 128
+/* ---- 1 Commander Yammark: 6 dragonfly options in 4 formations (user decisions 2026-11-09, the kit: speed) -------
+ * The options come out at the first shot or special after the change (y_on), with the formation's voice (user request
+ * 2026-11-11; that special no step). Then the special button steps the formation (yam_form):
+ * 0 circle (the orbit, r 32), 1 wedge (a V, its point ahead), 2 line abreast (a column of 6 in front),
+ * 3 column (the train: each one on Axl's path, the boss's sub 9). The shot button held: the formation's attack -
+ * circle: the gatling ahead (one option after another, a shot every Y_GAT frames: 20 a second), wedge: the same
+ * rate, every shot at one point ahead (the nearest enemy), line: all 6 at once every Y_LINE_GAP frames, column:
+ * a bomb every Y_BOMB_GAP frames, the drones in turn (user requests 2026-11-10: bombs only, a carpet). The button
+ * held or not: the circle's options hit what they touch. The shots: damage id boss_mods[1].shot_id (the buster's), P_DNA (gone
+ * with the change), at most Y_SHOT_CAP of them and never into the table's last P_RESERVE entries; the shot sound
+ * every second shot. A change of formation: X8's copy-shot sound and the options blink (the release has no HUD) */
+#define Y_OPTS 6
+#define Y_HIST 256
+#define Y_TRAIN_GAP 24  /* frames of Axl's path between two options of the column */
+#define Y_GAT 3         /* frames between two gatling shots (circle) */
+#define Y_LINE_GAP 15   /* frames between two volleys of the line */
+#define Y_SHOT_CAP 34   /* (22 cut the line's volleys and the gatling short: user report 2026-11-10) */
+#define P_RESERVE 8
+#define Y_SHOT_LIFE 120   /* (off the screen first: 30-45 frames ended them mid-screen, user report 2026-11-10) */
+int yam_capped;   /* test: shots the budget refused */
+#define Y_BOMB_GAP 4    /* frames between two bombs of the column (user request 2026-11-10: a carpet, 10 was the
+                         * gap of the old drops on what was below) */
+#define Y_BLINK 8
 static const signed char box_opt[4] = {-16, -6, 32, 12};
 static const signed char box_shot[4] = {-7, -7, 14, 14};
 static const signed char box_bomb[4] = {-2, -6, 4, 12};
 static const signed char box_blast[4] = {-8, -8, 16, 16};
-static const unsigned char y_period[Y_OPTS] = {30, 25, 45};
-#define Y_HIT_GAP 20   /* frames between an option's body hits (its box on for 2 of them) */   /* 0x80100B68: per-slot fire periods */
-static char *y_opt[Y_OPTS];
+#define Y_CHARGE_GAP 8    /* the wedge: a drone sent off every 8 frames while the shot button is held (user decision
+                           * 2026-11-10: the wedge charges instead of shooting at one point) */
+#define Y_CHARGE_LEN 24   /* frames a charge lasts at most (then back to its spot) */
+#define Y_CHARGE_V 9      /* its speed, px/f */
+#define Y_TRAIL_STEP 2    /* frames per picture of the charge's jet streak (the boss's 77-83, looped on the drone:
+                           * user request 2026-11-10, over the drone - not left behind) */
+#define Y_HIT_GAP 20   /* frames between an option's body hits (its box on for 2 of them) */
+#define YG_N 6
+static char *y_opt[Y_OPTS], *yg_opt[YG_N], *y_jet_w[Y_OPTS + YG_N];
+static signed char y_rot[Y_OPTS] = {-1, -1, -1, -1, -1, -1};   /* the charging drone's turned picture (GIGA_OPT_ROT + d),
+                                                               * -1: its own (FX_OPT) */
 static short y_hx[Y_HIST], y_hy[Y_HIST];
-static unsigned char y_head;
+static unsigned short y_head;
+static int y_on, y_n, y_blink, y_snd, y_voice;   /* y_voice: test, the last formation voice */
+int yam_form;   /* axl_hud.c, the test's yam_form */
 
+void axl_boom_fn(char *w, proj *q);   /* axl_x.c: the game's explosion pictures */
+
+/* the jet streak: the boss's pictures 77-83 from his HUD section (GIGA_JET, GIGA_JET_R facing right: the FX frames
+ * are all taken), on drone slot q->b (its place and speed, y_jet_w): below Y_OPTS a formation drone while it charges,
+ * then the giga's drones (user request 2026-11-10: circling too); q->a 1 = it flies right */
+static void y_option(char *w, proj *q);
+static void yg_option(char *w, proj *q);
+static void y_jet(char *w, proj *q)
+{
+    int f = (q->t / Y_TRAIL_STEP) % GIGA_JET_N, k = q->b;
+    char *o = k < Y_OPTS ? y_opt[k] : yg_opt[k - Y_OPTS];
+    proj *oq = o ? proj_of(o) : 0;
+    if (dead_dna(w, 1))
+        return;
+    if (!oq || !oq->live || (k < Y_OPTS ? oq->fn != y_option || oq->c <= 0 : oq->fn != yg_option) ||
+        y_jet_w[k] != w) {
+        if (y_jet_w[q->b] == w)
+            y_jet_w[k] = 0;
+        proj_kill(w);
+        return;
+    }
+    q->life = q->t + 2;
+    PX(w) = PX(o);
+    PY(w) = PY(o);
+    VX(w) = VX(o);
+    VY(w) = VY(o);
+    if (k < Y_OPTS && y_rot[k] >= 0) {           /* a turned drone (the wedge's charge): its streak turned too */
+        int n = GIGA_JET_ROT_N / GIGA_OPT_ROT_N, g = 64 + y_rot[k] * n + (q->t / Y_TRAIL_STEP) % n;
+        if (q->c != g) {
+            q->c = g;
+            proj_pose_look(w, HUD_TEX_INDEX, HUD_PAT, GIGA_JET_ROT + g - 64);
+        }
+        return;
+    }
+    q->a = (*(volatile unsigned char *)(o + 0x29) & 0x40) != 0;
+    if (q->c != f + 1 + 16 * q->a) {
+        q->c = f + 1 + 16 * q->a;
+        proj_pose_look(w, HUD_TEX_INDEX, HUD_PAT, (q->a ? GIGA_JET_R : GIGA_JET) + f);   /* (boss 1's section) */
+    }
+}
+
+/* drone w (slot k of y_jet) has its jet streak on */
+static void y_jet_on(char *w, int k)
+{
+    proj *jq = y_jet_w[k] ? proj_of(y_jet_w[k]) : 0;
+    char *tr;
+    if (jq && jq->live && jq->fn == y_jet && jq->b == k)
+        return;
+    tr = proj_spawn(1, PX(w), PY(w), 0, 0, 0, 2, y_jet, P_PIERCE | P_WALL | P_NOSCREEN);
+    y_jet_w[k] = tr;
+    if (tr) {
+        proj_nobox(tr);
+        proj_of(tr)->b = k;
+        y_jet(tr, proj_of(tr));
+    }
+}
+static int yam_blasts;   /* test: the bombs that went off */
 static void y_bomb(char *w, proj *q)
 {
-    int vy = VY(w) - 0x1000;                      /* vy -1 px/f, -1/16 px/f per frame, at most -3 */
-    VY(w) = vy < FXP(-3) ? FXP(-3) : vy;
+    int vy = VY(w) - 0x4000;                      /* vy -3 px/f, -1/4 px/f per frame, at most -8 (faster: user
+                                                   * request 2026-11-10) */
+    VY(w) = vy < FXP(-8) ? FXP(-8) : vy;
     if (TERR(w) & 8) {                            /* floor: 3 blasts at (+10,-8) (-16,-4) (+4,-12) */
         static const signed char off[3][2] = {{10, -8}, {-16, -4}, {4, -12}};
         int i;
         char *b;
+        yam_blasts++;
+        if (test_on)
+            test_log("yammark bomb blast at %d %d", (int)PX(w), (int)PY(w));
         for (i = 0; i < 3; i++) {
-            b = proj_spawn(1, PX(w) + off[i][0], PY(w) + off[i][1], 0, 0, 1, 30, 0, P_PIERCE | P_WALL | P_NOSCREEN);
+            b = proj_spawn(1, PX(w) + off[i][0], PY(w) + off[i][1], 0, 0, 1, 34, axl_boom_fn,
+                           P_PIERCE | P_WALL | P_NOSCREEN);
             if (b) {
                 proj_box(b, box_blast);
-                proj_boss_look(b, FX_BOOM);
+                axl_boom_fn(b, proj_of(b));
             }
         }
         proj_kill(w);
     }
 }
 
+/* one shot of the kit from w at (vx, vy) 16.16 px/f: within the budget (0: none made) */
+static char *y_shot(char *w, int vx, int vy, int life, int sound)
+{
+    char *s;
+
+    if (proj_count(P_DNA) >= Y_SHOT_CAP || proj_free() <= P_RESERVE) {
+        yam_capped++;
+        return 0;
+    }
+    s = proj_spawn(boss_mods[1].shot_id, PX(w), PY(w), vx, vy, vx >= 0, life, 0, P_DNA);
+    if (!s)
+        return 0;
+    proj_box(s, box_shot);
+    proj_boss_look(s, FX_SHOT);
+    if (sound && (y_n++ & 1) == 0) {
+        axl_sound(SND_YAM_SHOT);
+        y_snd++;
+    }
+    return s;
+}
+
+/* the spot of option i in formation f */
+static void y_spot(char *p, proj *q, int i, float *tx, float *ty)
+{
+    int f = yam_form, h, r, s, ang;
+
+    switch (f) {
+    case 0:                                       /* circle: r 32 px, 3 deg/f */
+        q->b += FACE(p) ? -0x22 : 0x22;
+        ang = (q->b + i * (0x1000 / Y_OPTS)) & 0xfff;
+        *tx = PX(p) + 32 * cosf(ang * 6.2831853f / 4096);
+        *ty = PY(p) - 24 - 32 * sinf(ang * 6.2831853f / 4096);
+        break;
+    case 1:                                       /* wedge: rows 0-2 back from the point, one each side */
+        r = i / 2;
+        s = i & 1 ? 1 : -1;
+        *tx = PX(p) + SX(p) * (52 - 16 * r);
+        *ty = PY(p) - 24 + s * (6 + 12 * r);
+        break;
+    case 2:                                       /* line abreast: a column 16 px apart in front */
+        *tx = PX(p) + SX(p) * 28;
+        *ty = PY(p) - 24 + (i - (Y_OPTS - 1) / 2.0f) * 16;
+        break;
+    default:                                      /* column: on Axl's path (i + 1) * Y_TRAIN_GAP frames back */
+        h = (y_head - (i + 1) * Y_TRAIN_GAP) & (Y_HIST - 1);
+        *tx = y_hx[h];
+        *ty = y_hy[h] - 24;
+        break;
+    }
+}
+
 static void y_option(char *w, proj *q)
 {
-    char *p = axl_p, *e;
-    int i = q->a, ang, h, d;
+    char *p = axl_p;
+    int i = q->a, d;
     float tx, ty;
 
-    if (dead_dna(w, 1))
+    if (dead_dna(w, 1) || !p)
         return;
     q->life = q->t + 2;                           /* lives while the DNA lasts */
-    /* their body hits (user request 2026-10-29: the orbiting ones too - the boss's have no box there - but with a
-     * gap, a hit every Y_HIT_GAP frames: piercing every frame they hit many times over) */
-    if (q->t % Y_HIT_GAP == 0)
-        proj_box(w, box_opt);
-    else if (q->t % Y_HIT_GAP == 2)
-        proj_nobox(w);
-    if (!dna_alt) {                               /* orbit: r 32 px, 3 deg/f */
-        q->b += FACE(p) ? -0x22 : 0x22;
-        ang = (q->b + i * 0x555) & 0xfff;
-        tx = PX(p) + 32 * cosf(ang * 6.2831853f / 4096);
-        ty = PY(p) - 24 - 32 * sinf(ang * 6.2831853f / 4096);
-    } else {                                      /* train: slot i follows Axl's path (i + 1) * 30 frames back */
-        h = (y_head - (i + 1) * 30) & (Y_HIST - 1);
-        tx = y_hx[h];
-        ty = y_hy[h] - 24;
-        if (q->c)
-            q->c--;
-        else if ((e = find_target(PX(w), PY(w), 160)) != 0 && fabsf(PX(e) - PX(w)) < 12 && PY(e) > PY(w) + 0x30) {
-            char *b = proj_spawn(1, PX(w), PY(w), 0, FXP(-1), FACE(p), 0, y_bomb, P_KEEP);
-            if (b) {
-                proj_box(b, box_bomb);
-                proj_boss_look(b, FX_BOMB);
-            }
-            q->c = 30;                            /* bomb cooldown */
+    if (q->c > 0 && yam_form != 1)
+        q->c = 0;
+    if (q->c > 0) {                               /* the wedge's charge (q->c frames left): straight at the spot
+                                                   * picked at launch, its body box on, then back to its place */
+        float dx = q->tx - PX(w), dy = q->ty - PY(w), n = sqrtf(dx * dx + dy * dy);
+        q->c--;
+        if (n < Y_CHARGE_V)
+            q->c = 0;
+        if (n < 1)
+            n = 1;
+        VX(w) = (int)(dx / n * Y_CHARGE_V * 65536);
+        VY(w) = -(int)(dy / n * Y_CHARGE_V * 65536);
+        /* nose first (user request 2026-11-11): its picture turned to the way it flies (GIGA_OPT_ROT_N directions,
+         * 0 = right, counter-clockwise; HUD pictures are drawn unmirrored) */
+        d = (int)floorf(atan2f(-dy, dx) * GIGA_OPT_ROT_N / 6.2831853f + 0.5f);
+        d = ((d % GIGA_OPT_ROT_N) + GIGA_OPT_ROT_N) % GIGA_OPT_ROT_N;
+        *(volatile unsigned char *)(w + 0x29) &= ~0x40;
+        if (y_rot[i] != d) {
+            y_rot[i] = (signed char)d;
+            proj_pose_look(w, HUD_TEX_INDEX, HUD_PAT, GIGA_OPT_ROT + d);   /* (boss 1's section) */
+            if (test_on)
+                test_log("yammark drone %d turned %d", i, d);
         }
+        proj_box(w, box_opt);
+        q->flags &= ~P_HIDDEN;
+        y_jet_on(w, i);                           /* its jet streak */
+        return;
     }
-    d = dna_alt ? FXP(3) : FXP(8);               /* toward the spot, at most 3 px/f (train), 8 while orbiting */
+    if (y_rot[i] >= 0) {                          /* (back from a charge: its own picture again) */
+        y_rot[i] = -1;
+        proj_boss_look(w, FX_OPT);
+    }
+    /* their body hits: the circle's (user request 2026-10-29: with a gap, a hit every Y_HIT_GAP frames) */
+    if (yam_form == 0 && q->t % Y_HIT_GAP == 0)
+        proj_box(w, box_opt);
+    else if (yam_form != 0 || q->t % Y_HIT_GAP == 2)
+        proj_nobox(w);
+    y_spot(p, q, i, &tx, &ty);
+    d = yam_form == 3 ? FXP(3) : FXP(8);          /* toward the spot, at most 3 px/f (column), else 8 */
     VX(w) = clampi((int)((tx - PX(w)) * 65536), -d, d);
     VY(w) = -clampi((int)((ty - PY(w)) * 65536), -d, d);
     *(volatile unsigned char *)(w + 0x29) = *(volatile unsigned char *)(p + 0x29);
+    if (y_blink)                                  /* (a new formation: they blink) */
+        q->flags = (y_blink & 2) ? q->flags | P_HIDDEN : q->flags & ~P_HIDDEN;
+    else
+        q->flags &= ~P_HIDDEN;
+}
+
+/* The wedge's charge hits for 1 less (user request 2026-11-11: 4 on the common enemies, whose table gives the Yanma
+ * Option id 1 a 5; at least 1). axl_x.c axl_boss_hp_set asks it for each enemy loss: one while the wedge is up and a
+ * charging drone is on the enemy (Y_CHARGE_NEAR px; the PC enemy keeps no last hit number where the PS1 one did,
+ * e+0x65: the probe of 2026-11-11 found none) is the charge's */
+#define Y_CHARGE_LESS 1
+#define Y_CHARGE_NEAR 40.0f
+int dna_hit_loss(char *e, int loss)
+{
+    int i;
+    proj *q;
+    if (dna_boss != 1 || yam_form != 1 || loss <= 1)
+        return loss;
+    for (i = 0; i < Y_OPTS; i++)
+        if (y_opt[i] && (q = proj_of(y_opt[i])) && q->fn == y_option && q->c > 0 &&
+            fabsf(PX(y_opt[i]) - PX(e)) <= Y_CHARGE_NEAR && fabsf(PY(y_opt[i]) - PY(e)) <= Y_CHARGE_NEAR) {
+            int less = loss - Y_CHARGE_LESS < 1 ? 1 : loss - Y_CHARGE_LESS;
+            if (test_on)
+                test_log("yammark charge hit %d -> %d", loss, less);
+            return less;
+        }
+    return loss;
+}
+
+/* the held shot button's attack of the formation, frame t of the change */
+static void y_attack(char *p, int t)
+{
+    int i, k;
+    char *w;
+    float tx, ty, dx, dy, n;
+
+    if (yam_form == 2) {                          /* line: a volley of all 6 */
+        if (t % Y_LINE_GAP)
+            return;
+        for (i = 0; i < Y_OPTS; i++)
+            if (y_opt[i])
+                y_shot(y_opt[i], SX(p) * FXP(6), 0, Y_SHOT_LIFE, i == 0);
+        return;
+    }
+    if (yam_form == 1) {                          /* wedge: the drones charge in turn (above: y_option) */
+        proj *o;
+        if (t % Y_CHARGE_GAP)
+            return;
+        k = t / Y_CHARGE_GAP;
+        for (i = 0; i < Y_OPTS; i++) {
+            w = y_opt[(k + i) % Y_OPTS];
+            o = w ? proj_of(w) : 0;
+            if (o && o->c == 0)
+                break;
+        }
+        if (i == Y_OPTS)
+            return;
+        aim_point(p, 220, 120, &tx, &ty);
+        dx = tx - PX(w);
+        dy = ty - PY(w);
+        n = sqrtf(dx * dx + dy * dy);
+        if (n < 1)
+            n = 1;
+        o->tx = tx + dx / n * 24;                 /* (through the enemy, a little past it) */
+        o->ty = ty + dy / n * 24;
+        o->c = Y_CHARGE_LEN;
+        if ((y_n++ & 1) == 0) {
+            axl_sound(SND_YAM_SHOT);
+            y_snd++;
+        }
+        return;
+    }
+    k = yam_form == 3 ? Y_BOMB_GAP : Y_GAT;
+    if (t % k)
+        return;
+    k = t / k;
+    for (i = 0; i < Y_OPTS && !y_opt[(k + i) % Y_OPTS]; i++)
+        ;
+    if (i == Y_OPTS)
+        return;
+    w = y_opt[(k + i) % Y_OPTS];
+    if (yam_form == 3) {                          /* column: a carpet of bombs, the drones in turn (user request
+                                                   * 2026-11-10: no gatling, bombs while the button is held) */
+        char *b;
+        if (proj_free() <= P_RESERVE + 3) {      /* (room for its 3 blasts too) */
+            yam_capped++;
+            return;
+        }
+        b = proj_spawn(1, PX(w), PY(w), 0, FXP(-3), FACE(p), 90, y_bomb, P_KEEP | P_NOSCREEN);   /* (off the screen edge: on, 90 frames) */
+        if (b) {
+            proj_box(b, box_bomb);
+            proj_boss_look(b, FX_BOMB);
+            if ((y_n++ & 1) == 0) {
+                axl_sound(SND_YAM_SHOT);
+                y_snd++;
+            }
+        }
+        return;
+    }
+    y_shot(w, SX(p) * FXP(8), 0, Y_SHOT_LIFE, 1);   /* circle: the gatling ahead */
 }
 
 static void y_fire(char *p, int t, int fire)
 {
     int i;
-    char *w, *s;
+    char *w;
     proj *q;
 
     for (i = 0; i < Y_OPTS; i++) {
         w = y_opt[i];
         q = w ? proj_of(w) : 0;
         if (!q || q->fn != y_option || q->a != i) {
+            y_opt[i] = 0;
+            if (!y_on || dna_giga_busy())
+                continue;
             w = proj_spawn(1, PX(p), PY(p) - 24, 0, 0, FACE(p), 0, y_option, P_PIERCE | P_TOUGH | P_WALL | P_NOSCREEN);
             y_opt[i] = w;
+            y_rot[i] = -1;
             if (!w)
                 continue;
             proj_boss_look(w, FX_OPT);
-            proj_of(w)->a = i;                    /* (its box: y_option) */
-        }
-        /* orbit fire: slot i shoots every y_period[i] frames, 3.75 px/f horizontally */
-        if (fire && !dna_alt && t % y_period[i] == 0) {
-            s = proj_spawn(1, PX(w), PY(w), SX(p) * 0x3c000, 0, FACE(p), 0, 0, 0);
-            if (s && i == 0)
-                axl_sound(SND_YAM_SHOT);
-            if (s) {
-                proj_box(s, box_shot);
-                proj_boss_look(s, FX_SHOT);
-            }
+            proj_nobox(w);                        /* (its box: y_option, the circle's only - none where it comes out) */
+            proj_of(w)->a = i;
         }
     }
+    if (fire && !dna_giga_busy())
+        y_attack(p, t);
+}
+
+/* The change of formation's motion (user decisions 2026-11-10): he stops (dna_yam_hold: no input) and plays the
+ * toss look (boss_look: arms up 94-99, then the pointing 102-109) while his HUD section's FORM pictures play on him:
+ * the light gathering (43-48), the flash (49-51) - then, as he points, the ring going out (52-61) and the drones
+ * take the new formation */
+#define YF_POINT 18       /* frame of the motion he points at (the toss look's 94-99, 3 frames each) */
+#define YF_LEN 42         /* the toss look's length (then 102-109, 3 frames each) */
+#define YF_STEP 2         /* frames per FORM picture */
+#define YF_GATHER 9       /* FORM pictures before the ring (43-51) */
+#define YF_DY 31          /* the FORM pictures' center above Axl's origin: his chest (the look's boss origin
+                           * is 23 px up, the chest 4-8 px above it; user reports 2026-11-10: not the head, 13 and 27 px up
+                           * too low) */
+
+static void y_formfx(char *w, proj *q)
+{
+    int f = q->t / YF_STEP;
+    char *p = axl_p;
+    if (dead_dna(w, 1) || !p)
+        return;
+    if (f >= q->b) {
+        proj_kill(w);
+        return;
+    }
+    q->life = q->t + 2;
+    PX(w) = PX(p);
+    PY(w) = PY(p) - YF_DY;
+    VX(w) = VY(w) = 0;
+    if (q->c != f + 1) {
+        q->c = f + 1;
+        proj_pose_look(w, HUD_TEX_INDEX, HUD_PAT, GIGA_FORM + q->a + f);   /* (boss 1's section) */
+    }
+}
+
+static void y_formfx_spawn(char *p, int first, int n)
+{
+    char *w = proj_spawn(1, PX(p), PY(p) - YF_DY, 0, 0, 0, 2, y_formfx, P_PIERCE | P_WALL | P_NOSCREEN);
+    if (w) {
+        proj_nobox(w);
+        proj_of(w)->a = first;
+        proj_of(w)->b = n;
+        y_formfx(w, proj_of(w));
+    }
+}
+
+/* his voice, the formation's name (user requests 2026-11-10/11): circle "Formation... Guard!", wedge "Delta!" (without
+ * the user's file "Wing!"), line abreast "Line!", column "Final!" */
+static void y_say(int f)
+{
+    static const int voice[4] = {SND_YAM_GUARD, SND_YAM_WING, SND_YAM_LINE, SND_YAM_FINAL};
+    y_voice = voice[f & 3];
+    axl_voice(y_voice);
+}
+
+/* the options out (none yet since the change): the formation's voice */
+static void y_wake(void)
+{
+    y_on = 1;
+    y_say(yam_form);
+    if (test_on)
+        test_log("yammark options out");
+}
+
+/* axl_dna.c dna_after: the special button while changed into Yammark (none while the motion plays); with no options
+ * out yet it brings them out instead */
+void yam_next_form(void)
+{
+    if (dna_toss_t >= 0 || dna_giga_busy())
+        return;
+    if (!y_on) {
+        y_wake();
+        return;
+    }
+    dna_toss_t = 0;
+    if (test_on)
+        test_log("yammark formation motion");
+}
+
+/* axl_x.c: his motion of the change of formation holds him (no input) */
+int dna_yam_hold(void)
+{
+    return dna_boss == 1 && dna_toss_t >= 0;
+}
+
+static void y_form_tick(char *p)
+{
+    int t = dna_toss_t;
+    if (t < 0)
+        return;
+    if (t == 0) {
+        y_formfx_spawn(p, 0, YF_GATHER);
+        y_say(yam_form + 1);
+    }
+    if (t == YF_POINT) {
+        y_formfx_spawn(p, YF_GATHER, GIGA_FORM_N - YF_GATHER);
+        yam_form = (yam_form + 1) & 3;
+        y_blink = Y_BLINK;
+        axl_sound(SND_COPY);
+        if (test_on)
+            test_log("yammark formation %d", yam_form);
+    }
+    if (++dna_toss_t >= YF_LEN)
+        dna_toss_t = -1;
 }
 
 void dna_yammark(char *p, int t, int fire, int fire_new)
 {
     int i;
 
+    (void)fire_new;
     y_head = (y_head + 1) & (Y_HIST - 1);
     y_hx[y_head] = (short)PX(p);
     y_hy[y_head] = (short)PY(p);
-    if (t == 1)
+    if (t == 1) {
         for (i = 0; i < Y_HIST; i++) {
             y_hx[i] = (short)PX(p);
             y_hy[i] = (short)PY(p);
         }
+        y_on = y_n = y_blink = y_voice = 0;
+        /* (yam_form kept: the next change starts in the last formation, user decision 2026-11-10) */
+    }
+    if (y_blink)
+        y_blink--;
+    if (fire && !y_on) {
+        y_wake();                                 /* the first shot: the options come out (no shot this frame) */
+        fire = 0;
+    }
+    y_form_tick(p);
     y_fire(p, t, fire);
+}
+
+/* test: the options out now */
+int yam_opts(void)
+{
+    int i, n = 0;
+    for (i = 0; i < Y_OPTS; i++)
+        n += y_opt[i] != 0 && proj_of(y_opt[i]) && proj_of(y_opt[i])->fn == y_option;
+    return n;
 }
 
 /* ---- 2 Blizzard Wolfang: ice chunk lands on the target in 46 frames, 3 random shards ------------------- */
@@ -669,6 +1047,11 @@ void dna_mijinion(char *p, int t, int fire, int fire_new)
 
 static int giga_k, giga_t, giga_pose = -1;   /* the running giga's boss (0 none), its frame, its atk motion time */
 
+static int dna_giga_busy(void)
+{
+    return giga_k != 0 && giga_k == dna_boss;
+}
+
 void dna_giga_reset(void)
 {
     giga_k = 0;
@@ -682,84 +1065,169 @@ int dna_giga_look(void)
     return giga_k ? giga_pose : -1;
 }
 
-/* 1 Yammark: 6 options line up above him (26 px apart, 72 up) in 30 frames, then dive one after another every 8
- * frames, 7 px/f at the nearest enemy below them (none: forward and down), and burst into 3 blasts where they hit the terrain
- * (BIN 33 sub 6, the option line dive the boss keeps for Zero; the 6 options of his last third) */
-#define YG_N 6
-#define YG_LINE 30
-#define YG_GAP 8
+/* 1 Yammark (user decisions 2026-11-09, a shoot-'em-up's bomb): the enemy shots around are cleared, his 6 options
+ * circle him (r 40) for YG_SPIRAL frames throwing a 3-armed spiral (options 0, 2, 4: a shot outward every YG_SHOT
+ * frames as the ring turns) while he is invincible and keeps flying; then all 6 charge at once, each at one of the
+ * enemies on the screen (in turn; none: a fan ahead), 7 px/f, bursting into one blast (32 x 32) at the spot, on the
+ * terrain or after YG_RUN frames. Damage id GID_YAM (X's charged Yanma Option), P_GIGA. His own options wait */
+#define YG_SPIRAL 120
+#define YG_TURN 0xA0      /* the ring's turn per frame, 1/4096 (14 deg: a turn in 26 frames; 0x100 = 16 frames, too fast - the drones and their
+                           * jet streaks nearly a closed ring, user requests 2026-11-10; was 0x40) */
+#define YG_SHOT 6
+#define YG_VOICE 90      /* frames of the giga's voice (1.4 s) and a little after */
+#define YG_RUN 60
+static const signed char box_ygblast[4] = {-16, -16, 32, 32};
+static int yg_hits0;
+int yam_eb_cleared;   /* test (eb_cleared) */
 
-static void yg_blasts(char *w)
+static void yg_blast(char *w)
 {
-    static const signed char off[3][2] = {{10, -8}, {-16, -4}, {4, -12}};
-    int i;
-    char *b;
-    for (i = 0; i < 3; i++) {
-        b = proj_spawn(GID_YAM, PX(w) + off[i][0], PY(w) + off[i][1], 0, 0, 1, 30, 0,
-                       P_PIERCE | P_WALL | P_NOSCREEN | P_GIGA);
-        if (b) {
-            proj_box(b, box_blast);
-            proj_boss_look(b, FX_BOOM);
-        }
+    char *b = proj_spawn(GID_YAM, PX(w), PY(w), 0, 0, 1, 34, axl_boom_fn, P_PIERCE | P_WALL | P_NOSCREEN | P_GIGA);
+    if (b) {
+        proj_box(b, box_ygblast);
+        axl_boom_fn(b, proj_of(b));   /* (the game's explosion, axl_x.c) */
     }
 }
 
 static void yg_option(char *w, proj *q)
 {
-    char *p = axl_p, *e;
-    int i = q->a, d;
+    char *p = axl_p;
+    int i = q->a, d, ang;
     float tx, ty, dx, dy, n;
 
     if (dead_dna(w, 1) || !p)
         return;
-    if (q->b == 1) {                              /* diving: straight on until the terrain */
-        if (TERR(w)) {
-            yg_blasts(w);
+    if (q->b == 1) {                              /* charging: on to the spot */
+        dx = q->tx - PX(w);
+        dy = q->ty - PY(w);
+        if ((TERR(w) && q->t > 4) || dx * dx + dy * dy < 49 || q->t >= YG_RUN) {
+            yg_blast(w);
             proj_kill(w);
+            return;
         }
+        y_jet_on(w, Y_OPTS + i);
         return;
     }
-    if (q->t >= YG_LINE + YG_GAP * i) {           /* its turn: the dive */
-        e = find_target(PX(w), PY(w), 260);
-        if (e && PY(e) < PY(w) + 16)
-            e = 0;                                /* (a dive: only at what is below the line) */
-        dx = e ? PX(e) - PX(w) : SX(p) * 40.0f;
-        dy = e ? PY(e) - 8 - PY(w) : 80.0f;
-        n = sqrtf(dx * dx + dy * dy);
-        if (n < 1)
-            n = 1;
-        VX(w) = (int)(dx / n * 7 * 65536);
-        VY(w) = -(int)(dy / n * 7 * 65536);
-        q->b = 1;
-        q->flags = (q->flags & ~P_WALL) | P_KEEP;
-        q->life = q->t + 90;
-        proj_box(w, box_opt);
-        axl_sound(SND_YAM_SHOT);
-        return;
-    }
-    tx = PX(p) + (i - (YG_N - 1) / 2.0f) * 26;   /* the line above him */
-    ty = PY(p) - 72;
-    d = FXP(8);
+    q->life = q->t + 2;
+    ang = (i * (0x1000 / YG_N) + giga_t * YG_TURN) & 0xfff;
+    tx = PX(p) + 40 * cosf(ang * 6.2831853f / 4096);
+    ty = PY(p) - 24 - 40 * sinf(ang * 6.2831853f / 4096);
+    d = FXP(24);                                  /* (the ring at YG_TURN: about 16 px/f) */
     VX(w) = clampi((int)((tx - PX(w)) * 65536), -d, d);
     VY(w) = -clampi((int)((ty - PY(w)) * 65536), -d, d);
-    *(volatile unsigned char *)(w + 0x29) = *(volatile unsigned char *)(p + 0x29);
+    *(volatile unsigned char *)(w + 0x29) = (unsigned char)((*(volatile unsigned char *)(w + 0x29) & ~0x40) | (VX(w) > 0 ? 0x40 : 0));
+    y_jet_on(w, Y_OPTS + i);
+    if (i % 2 == 0 && giga_t % YG_SHOT == 0 && giga_t > 6) {   /* the spiral: outward from him */
+        dx = PX(w) - PX(p);
+        dy = PY(w) - (PY(p) - 24);
+        n = sqrtf(dx * dx + dy * dy);
+        if (n > 1 && proj_free() > P_RESERVE / 2) {
+            char *s = proj_spawn(GID_YAM, PX(w), PY(w), (int)(dx / n * 4 * 65536), -(int)(dy / n * 4 * 65536),
+                                 dx >= 0, 48, 0, P_GIGA);
+            if (s) {
+                proj_box(s, box_shot);
+                proj_boss_look(s, FX_SHOT);
+                /* (while his "Formation... Spiral!" plays, every third shot's only: the sound every 6 frames
+                 * covered the voice's end, user report 2026-11-11) */
+                if (i == 0 && (giga_t >= YG_VOICE || giga_t % (YG_SHOT * 3) == 0))
+                    axl_sound(SND_YAM_SHOT);
+            }
+        }
+    }
 }
 
-static void giga_yammark(char *p)
+static void yg_charge(char *p)
 {
-    int i;
-    char *w;
+    char *list[YG_N], *w;
+    int n = objs_targets(PX(p), PY(p), 160, 120, list, YG_N), i;
+    float tx, ty, dx, dy, m;
+    proj *q;
+
     for (i = 0; i < YG_N; i++) {
-        w = proj_spawn(GID_YAM, PX(p), PY(p) - 24, 0, 0, FACE(p), 0, yg_option,
-                       P_PIERCE | P_WALL | P_NOSCREEN | P_GIGA);
-        if (!w)
+        w = yg_opt[i];
+        q = w ? proj_of(w) : 0;
+        if (!q || q->fn != yg_option)
             continue;
-        proj_boss_look(w, FX_OPT);
+        if (n) {
+            tx = PX(list[i % n]);
+            ty = PY(list[i % n]) - 8;
+        } else {                                  /* a fan ahead */
+            tx = PX(p) + SX(p) * 150;
+            ty = PY(p) - 24 + (i - (YG_N - 1) / 2.0f) * 30;
+        }
+        dx = tx - PX(w);
+        dy = ty - PY(w);
+        m = sqrtf(dx * dx + dy * dy);
+        if (m < 1)
+            m = 1;
+        VX(w) = (int)(dx / m * 7 * 65536);
+        VY(w) = -(int)(dy / m * 7 * 65536);
+        *(volatile unsigned char *)(w + 0x29) = (unsigned char)((*(volatile unsigned char *)(w + 0x29) & ~0x40) | (dx > 0 ? 0x40 : 0));
+        q->tx = tx;
+        q->ty = ty;
+        q->b = 1;
+        q->t = 0;
+        q->life = YG_RUN + 2;
+        q->flags = (q->flags & ~P_WALL) | P_KEEP;
         proj_box(w, box_opt);
-        proj_nobox(w);                            /* (no hit while lining up) */
-        proj_of(w)->a = i;
     }
-    giga_k = 0;                                   /* (the options go on by themselves; he keeps flying) */
+    axl_sound(SND_YAM_SHOT);
+    if (test_on)
+        test_log("giga 1: charge at %d targets", n);
+}
+
+static void giga_yammark(char *p, int t)
+{
+    int i, live = 0;
+    char *w;
+
+    if (t == 0) {
+        int c = block_enemy_shots(PX(p), PY(p), 320);
+        yam_eb_cleared += c;
+        y_voice = SND_YAM_SPIRAL;                 /* "Formation... Spiral!" (user request 2026-11-11) */
+        axl_voice(y_voice);
+        yg_hits0 = axl_enemy_hits;
+        for (i = 0; i < Y_OPTS; i++)              /* (his own options make way for the giga's) */
+            if (y_opt[i] && proj_of(y_opt[i]) && proj_of(y_opt[i])->fn == y_option) {
+                proj_kill(y_opt[i]);
+                y_opt[i] = 0;
+            }
+        for (i = 0; i < YG_N; i++) {
+            w = proj_spawn(GID_YAM, PX(p), PY(p) - 24, 0, 0, FACE(p), 0, yg_option,
+                           P_PIERCE | P_TOUGH | P_WALL | P_NOSCREEN | P_GIGA);
+            yg_opt[i] = w;
+            if (!w)
+                continue;
+            proj_boss_look(w, FX_OPT);
+            proj_box(w, box_opt);
+            proj_nobox(w);                        /* (the spiral's shots hit, not the ring) */
+            proj_of(w)->a = i;
+        }
+        if (test_on)
+            test_log("giga 1: %d enemy shots cleared", c);
+        return;
+    }
+    if (t == YG_SPIRAL)
+        yg_charge(p);
+    for (i = 0; i < YG_N; i++)
+        live += yg_opt[i] && proj_of(yg_opt[i]) && proj_of(yg_opt[i])->fn == yg_option;
+    if (t > YG_SPIRAL && (!live || t > YG_SPIRAL + YG_RUN + 4)) {
+        if (test_on)
+            test_log("giga 1: hits %d", axl_enemy_hits - yg_hits0);
+        giga_k = 0;
+    }
+}
+
+/* the giga keeps him invincible (axl_x.c axl_box): Yammark's spiral */
+int dna_giga_invincible(void)
+{
+    return giga_k == 1 && dna_boss == 1 && giga_t <= YG_SPIRAL;
+}
+
+/* test: the enemies' losses since the giga began (giga_dmg: the spiral's and the charge's) */
+int yam_giga_dmg(void)
+{
+    return axl_enemy_hits - yg_hits0;
 }
 
 /* 2 Wolfang: 4 ice chunks in a row (BIN 34 sub 0xA: 3-5 throws), one every 30 frames at the throw's frame of his
@@ -1232,8 +1700,15 @@ int dna_giga_start(char *p, int giga_new)
             test_log("giga %d: busy (move look %d)", k, moves_look());
         return 0;
     }
+    /* Axl's giga gauge (the Giga Crush's, one shared gauge: user decision 2026-11-11): full to start, emptied */
+    if (*(volatile short *)(p + 0x1A0) < *(volatile short *)(p + 0x2CC)) {
+        if (test_on)
+            test_log("giga %d: gauge %d of %d", k, *(volatile short *)(p + 0x1A0), *(volatile short *)(p + 0x2CC));
+        return 0;
+    }
     if (!skill_try(SK_GIGA))
         return 0;
+    *(volatile short *)(p + 0x1A0) = 0;
     giga_k = k;
     giga_t = 0;
     giga_pose = -1;
@@ -1255,7 +1730,7 @@ void dna_giga_tick(char *p)
     }
     t = giga_t++;
     switch (giga_k) {
-    case 1: giga_yammark(p); break;
+    case 1: giga_yammark(p, t); break;
     case 2: giga_wolfang(p, t); break;
     case 3: giga_heatnix(p, t); break;
     case 4: giga_shark(p, t); break;
@@ -1270,4 +1745,80 @@ void dna_giga_tick(char *p)
         if (test_on)
             test_log("giga end (t %d)", t);
     }
+}
+
+static int y_snd_mark;
+
+void dna_mark(void)   /* the test's mark: yam_snd counts from here */
+{
+    y_snd_mark = y_snd;
+}
+
+/* test values (axl_test.c value_of): the kits' numbers. *ok = 0: not one of these */
+int dna_value(const char *name, int *ok)
+{
+    extern int dna_hurt_raw, dna_hurt_extra, dna_hits, axl_last_dmg;
+    char *p = axl_p;
+
+    *ok = 1;
+    if (!strcmp(name, "proj_live"))
+        return N_PROJ - proj_free();
+    if (!strcmp(name, "proj_fails"))
+        return proj_fails;
+    if (!strcmp(name, "hurt_raw"))
+        return dna_hurt_raw;
+    if (!strcmp(name, "hurt_extra"))
+        return dna_hurt_extra;
+    if (!strcmp(name, "hurt_pct"))   /* damage taken over the game's own, percent (0: none yet) */
+        return dna_hurt_raw ? 100 * (dna_hurt_raw + dna_hurt_extra) / dna_hurt_raw : 0;
+    if (!strcmp(name, "dna_hits"))
+        return dna_hits;
+    if (!strcmp(name, "last_dmg"))
+        return axl_last_dmg;
+    if (!strcmp(name, "yam_opts"))
+        return dna_boss == 1 ? yam_opts() : 0;
+    if (!strcmp(name, "yam_snd"))   /* the kit's shot sounds so far */
+        return y_snd - y_snd_mark;
+    if (!strcmp(name, "xstate"))
+        return p ? (unsigned char)p[0x0D] : -1;
+    if (!strcmp(name, "afterimg"))
+        return p ? (unsigned char)p[0x114] : -1;
+    if (!strcmp(name, "look")) {
+        int dna_look_code(void);
+        return dna_look_code();
+    }
+    if (!strcmp(name, "yam_charging")) {          /* the wedge's drones charging now */
+        int i, n = 0;
+        for (i = 0; i < Y_OPTS; i++)
+            n += y_opt[i] && proj_of(y_opt[i]) && proj_of(y_opt[i])->c > 0;
+        return n;
+    }
+    if (!strcmp(name, "yam_blasts"))
+        return yam_blasts;
+    if (!strcmp(name, "yam_capped"))
+        return yam_capped;
+    if (!strcmp(name, "yam_form"))
+        return yam_form;
+    if (!strcmp(name, "yam_voice"))   /* the last formation voice's request (0: none since the change) */
+        return y_voice;
+    if (!strcmp(name, "yam_dash"))
+        return moves_yam_dash();
+    if (!strcmp(name, "yam_ghosts"))
+        return moves_yam_ghosts();
+    if (!strcmp(name, "hud_dash")) {
+        extern int hud_dash_on;
+        return hud_dash_on;
+    }
+    if (!strcmp(name, "eb_cleared"))
+        return yam_eb_cleared;
+    if (!strcmp(name, "giga_dmg"))
+        return yam_giga_dmg();
+    if (!strcmp(name, "hurtbox"))   /* Axl's hurt box on */
+        return p && *(void *volatile *)(p + 0x7C) != 0;
+    if (!strcmp(name, "eshots"))   /* enemy shots within 320 px */
+        return p ? count_enemy_shots(PX(p), PY(p), 320) : 0;
+    if (!strcmp(name, "enemy_near"))
+        return p && find_target(PX(p), PY(p), 200) != 0;
+    *ok = 0;
+    return 0;
 }
