@@ -1,0 +1,40 @@
+# Heatnix: no multi-hits, the 3-step blade (user requests 2026-11-12; axl_dna_bosses.c hit_once, axl_moves.c crescent_out):
+# changed next to the intro's first enemy (on the right, 12 hit points), one small fireball thrown at it: its hit
+# points fall by one hit of the fireball (log 'heat hit once', hpwatch), not twice in a row (the fireball alone took
+# 12 -> 6 -> 0 before). Then the special three times in a row: the 3-step blade \\, /, X (log 'heat blade step 0 / 1 / 2', shots 3, snaps).
+all_weapons
+hpwatch 7990
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1060 4
+idle 40
+pset 14C 3
+press 4 S
+idle 100
+press 2 RIGHT
+idle 10
+log heat_hit_once
+press 3 X
+idle 90
+log heat_one_blade
+mark
+press 2 S
+idle 22
+log snap_blade_1
+snap
+idle 6
+press 2 S
+idle 22
+log snap_blade_2
+snap
+idle 6
+press 2 S
+idle 22
+log snap_blade_3
+snap
+show shots
+expect shots == 3 b3_three_step_blades
+end

@@ -40,7 +40,9 @@ def feet_line():
 # (move / alt: boss_look.BOSSES, user request 2026-10-27: the moves showed the standing loop), then the boss's own
 # walk / jump (rising) / fall / land for what Axl does (user request 2026-10-27; flyers: forward / up / down)
 SEQS = ('idle', 'fire', 'atk', 'move', 'alt', 'walk', 'jump', 'fall', 'land', 'cling', 'ceil', 'cjump', 'cshot', 'cdash',
-        'leap', 'idle2', 'jump2', 'fall2', 'toss')
+        'leap', 'idle2', 'jump2', 'fall2', 'toss', 'giga')
+# giga: the boss's own motion of his giga attack, played once, the last held (axl_dna.c dna_look; Heatnix's Magma
+# Stream: anim 7, user request 2026-11-12); empty: his attack motion
 # toss: a thrown attack's motion played once by the boss's code (axl_dna.c dna_toss_t; Sheldon's shell, 2026-10-29)
 # idle2 / jump2 / fall2: the looks while the second attack is on, when it changes the boss (Sheldon: the shell held as
 # the plates - with the plates up no shell in his hands, user report 2026-10-28; empty: the plain ones)
@@ -51,6 +53,47 @@ MOTIONS = ('walk', 'jump', 'fall', 'land')
 EXTRAS = ('cling', 'ceil', 'cjump', 'cshot', 'cdash', 'leap')
 SEQ_MAX = 96   # entries of a sequence (Yammark's standing look: 90, 2026-10-29)
 HOLD = 255   # dna_seq.at of a motion: the entry its loop goes back to, HOLD = the last entry held
+
+
+# Poses drawn by the user (user request 2026-11-12: Heatnix's blade from his left wing, then his right one - the
+# 3-step blade's first two steps; art/heat_wing.aseprite, cut from his own pictures): picture id DRAWN_BASE + i in a
+# boss's sequences is the PNG art/NAME with its origin at (ox, oy) in it (found by matching its legs to his pictures
+# 29 / 30), its colours his palettes' (exact RGB as the sheet drew them)
+DRAWN_BASE = 2000
+DRAWN_POSES = {2000: ('heat_wing_f0.png', (70, 49)), 2001: ('heat_wing_f1.png', (51, 47)),
+               2002: ('heat_wing_f2.png', (70, 49)), 2003: ('heat_wing_f3.png', (64, 51))}
+ART = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'art')
+
+
+def drawn_pose(b, f):
+    """(parts [(attr, tile, x, y)], tiles [16x16], index image 2C x 2C) of DRAWN_POSES[f] in Boss b's palettes"""
+    import boss_look as L
+    from PIL import Image
+    name, (ox, oy) = DRAWN_POSES[f]
+    a = np.asarray(Image.open(os.path.join(ART, name)).convert('RGBA'))
+    pal = np.asarray(b.pals, np.int64).reshape(-1)
+    rgb = {((v & 31) * 255 // 31, (v >> 5 & 31) * 255 // 31, (v >> 10 & 31) * 255 // 31): i
+           for i, v in reversed(list(enumerate(pal))) if i % 16}
+    img = np.zeros((2 * L.C, 2 * L.C), np.uint8)
+    h, w = a.shape[:2]
+    for y, x in zip(*np.nonzero(a[..., 3])):
+        c = tuple(int(v) for v in a[y, x, :3])
+        if c not in rgb:   # (a colour not his: the nearest of his)
+            c = min(rgb, key=lambda q: sum((q[j] - c[j]) ** 2 for j in range(3)))
+        img[L.C - oy + y, L.C - ox + x] = rgb[c]
+    ys, xs = np.nonzero(img)
+    parts, tiles = [], []
+    for layer in sorted({int(v) for v in np.unique(img[img > 0] // 16)}):
+        lay = np.where((img > 0) & (img // 16 == layer), img % 16, 0).astype(np.uint8)
+        for ty in range(ys.min(), ys.max() + 1, 16):
+            for tx in range(xs.min(), xs.max() + 1, 16):
+                t = np.zeros((16, 16), np.uint8)
+                src = lay[ty:ty + 16, tx:tx + 16]
+                t[:src.shape[0], :src.shape[1]] = src
+                if t.any():
+                    parts.append((layer << 2 | len(tiles) >> 8, len(tiles) & 0xff, tx - L.C, ty - L.C))
+                    tiles.append(t)
+    return parts, tiles, img
 
 
 def boss_poses(k, feet_y, dat):
@@ -68,8 +111,10 @@ def boss_poses(k, feet_y, dat):
     # {picture: dx}: a picture drawn moved along x (in the boss's own facing). Not in the parts: their signed-byte x
     # cut Heatnix's firebird tail off (user report 2026-10-28) - the draw moves the player instead (push, axl_dna.c)
     shift = cfg.get('shift', {})
-    parts = {f: [(a, lo, x, y) for a, lo, x, y in b.parts(f) if not a & 0x20 and -128 <= x <= 127 - 15] for f in used}
-    imgs = {f: b.compose(f) for f in used}
+    drawn = {f: drawn_pose(b, f) for f in used if f >= DRAWN_BASE}   # (the user's own pictures, DRAWN_POSES)
+    parts = {f: drawn[f][0] if f in drawn else
+             [(a, lo, x, y) for a, lo, x, y in b.parts(f) if not a & 0x20 and -128 <= x <= 127 - 15] for f in used}
+    imgs = {f: drawn[f][2] if f in drawn else b.compose(f) for f in used}
     # (walk / jump / fall / land and the rest keep the boss's own offsets, e.g. Shark's jump pictures reach 13 px lower)
     # the feet (and the body: hurt box, height) from the standing / shooting / attack pictures only: the moves' and
     # second attacks' pictures (Heatnix's firebird, Shark's leap) are attacks - user report 2026-10-27, Heatnix grew
@@ -88,7 +133,7 @@ def boss_poses(k, feet_y, dat):
             t = lo | (a & 3) << 8
             if t not in ids:
                 ids[t] = len(tiles)
-                tiles.append(b.tile(a, lo, f).astype(np.uint8))
+                tiles.append(drawn[f][1][lo | (a & 3) << 8] if f in drawn else b.tile(a, lo, f).astype(np.uint8))
             i = ids[t]
             x, y = x + nx, y + dy + ny + lift
             assert -128 <= x <= 127 and -128 <= y <= 127, (cfg['name'], f, x, y)
@@ -753,6 +798,8 @@ GIGA_PICS = {1: (('JET', 0, (77, 78, 79, 80, 81, 82, 83), 0),
                  ('FORM', 0, tuple(range(43, 62)), 0)),   # the change of formation (user request 2026-11-10): the
              # light gathering 43-48, the flash 49-51, the ring 52-61   # Yammark's jet streak (the wedge drones' charge trail,
              # user request 2026-11-10: all 7 pictures - the FX frames end at 256, this section has room)
+             3: (('BIGFIRE', 0, (51, 52, 53, 54), 0),     # Heatnix's thrown fireball at full size (the charged shot,
+                 ('SPARK', 1, (3, 4, 5, 6), 0)),          # user request 2026-11-12) and its shards (parts table 1)
              5: (('BALL', 1, (21, 22, 23), 47),),          # Scaravich's rock ball at full size (size 4: about 96 px)
              8: (('GATHER', 0, (94, 95, 96, 97, 98, 99), 0),   # Mijinion's energy gathering (8 orbs closing in)
                  ('ORB', 0, (102, 103), 0))}                    # his small energy orb (the 8-way shot)
@@ -961,6 +1008,131 @@ def hud_pictures(fx_anims, bosses):
     return hud_rings(), icons, pals, giga_pictures_hud()
 
 
+# Heatnix's giga "Magma Stream" (user request 2026-11-12: the boss's purple flame, from above and below swallowing
+# the screen): the flame of his rematch room (st0ca.arc, stage background layer 1; re/lc2/stage/render_stage.py, the
+# boss code's frame table 0x800FE878 - re/lc2/stage/make_heat_flame.py): 4 frames 0x200 apart, the floor band at
+# layer y FLAME_FLOOR, the ceiling one at FLAME_CEIL, one CLUT (colour index FLAME_CLUT, its 16 colours =
+# heat_flame_pal). Each frame's left 320 px as FLAME_STRIPS pictures FLAME_W wide (the parts of one picture: a
+# signed byte from its middle), centred on the picture's origin.
+FLAME_ARC = 'st0ca.arc'
+FLAME_FLOOR, FLAME_CEIL = (0x910, 0x9D0), (0x9F0, 0xAB0)
+FLAME_X = (0x000, 0x200, 0x400, 0x600)
+FLAME_CLUT = 1808
+FLAME_W, FLAME_STRIPS = 160, 2
+
+
+def magma_pictures():
+    """(floor [8 index images], ceiling [...], palette [16]): frame k strip s at FLAME_STRIPS k + s"""
+    import boss_look as L
+    import render_stage as R   # (re/lc2/stage/render_stage.py, linked here: in the public export too)
+    S = R.Stage(FLAME_ARC, 'chr256', '0x')
+    lay, _ = R.ps1_layout(S.name, len(S.screens))
+    lay = lay[1]
+
+    def texels(y0, y1, x0, x1):   # the layer's colour indices (0 = none) in [y0, y1) x [x0, x1)
+        out = np.zeros((y1 - y0, x1 - x0), np.uint8)
+        for y in range(y0, y1, 16):
+            for x in range(x0, x1, 16):
+                s = int(lay[y // 256, x // 256])
+                v = int(S.screens[s, (y % 256) // 16, (x % 256) // 16]) & 0x3FFF if s else 0
+                c = S.cell(v) if v else None
+                if c is not None:
+                    idx = c[1] - FLAME_CLUT
+                    assert ((idx >= 0) & (idx < 16)).all(), 'another CLUT in the flame'
+                    out[y - y0:y - y0 + 16, x - x0:x - x0 + 16] = idx
+        return out
+
+    bands = []
+    for y0, y1 in (FLAME_FLOOR, FLAME_CEIL):
+        imgs = []
+        for x0 in FLAME_X:
+            band = texels(y0, y1, x0, x0 + FLAME_W * FLAME_STRIPS)
+            for st in range(FLAME_STRIPS):
+                img = np.zeros((2 * L.C, 2 * L.C), np.uint8)
+                part = band[:, st * FLAME_W:(st + 1) * FLAME_W]
+                h, w = part.shape
+                img[L.C - h // 2:L.C - h // 2 + h, L.C - w // 2:L.C - w // 2 + w] = part
+                imgs.append(img)
+        bands.append(imgs)
+    pal = [int(v) for v in S.col[FLAME_CLUT:FLAME_CLUT + 16]]
+    return bands[0], bands[1], pal
+
+
+# Heatnix's 3-step blade (user request 2026-11-12: the special pressed in a row throws "\\", "/", then both crossed
+# as an X): his crescent (anim 0xB pictures BLADE_SRC) narrowed to BLADE_XS of its width, stretched BLADE_ST tall and
+# leaned (x' = x + k (y - cy), no turning: its middle stays forward, the tips bent back) by +BLADE_K ("\\") and
+# -BLADE_K ("/"); the X: both over each other, the brighter colour where they cross. Frames len(BLADE_SRC) s + i (s: 0 "\\",
+# 1 "/", 2 X; i < len(BLADE_SRC)), placed so the bounding box's middle keeps the crescent's offset from its origin.
+BLADE_SRC = (55, 57)   # (every other picture, as FX FIRE: the four overflowed the HUD texture's 1024 tiles)
+BLADE_K, BLADE_ST, BLADE_XS = 0.40, 1.15, 0.75
+# the "/" (user requests 2026-11-12, by a sketch): hardly leaned (BLADE_UK), its top bent back from BLADE_T0 of the
+# height above the middle (growing with the square), just so far that in the X its top end reaches the "\\"'s bottom
+# end (found per picture)
+BLADE_UK, BLADE_T0 = 0.10, 0.35
+BLADE_CW = 400          # the warp canvas (its x 200: the source's middle)
+
+
+def blade_warp(src, k, hook=0.0, t0=0.5):
+    """the crescent's rows narrowed BLADE_XS, stretched BLADE_ST, each shifted k (y - cy) + hook H a^2 (a: the height
+    above t0 of the half, 0..1) -> (index image H x BLADE_CW, the source's box middle (x, y))"""
+    ys, xs = np.nonzero(src)
+    y0, x0 = ys.min(), xs.min()
+    c = src[y0:ys.max() + 1, x0:xs.max() + 1]
+    h, w = c.shape
+    H = int(h * BLADE_ST)
+    out = np.zeros((H, BLADE_CW), np.uint8)
+    cy = H / 2
+    for y in range(H):
+        up = max(0.0, (cy - y) / cy)
+        a = max(0.0, (up - t0) / (1 - t0))
+        sh = k * (y - cy) + hook * H * a * a
+        sy = min(h - 1, int(y / BLADE_ST))
+        for x in range(BLADE_CW):
+            sx = int((x - BLADE_CW // 2 - sh) / BLADE_XS + w / 2)
+            if 0 <= sx < w:
+                out[y, x] = c[sy, sx]
+    return out, (x0 + w // 2, y0 + h // 2)
+
+
+def blade_pictures(b, pals):
+    """the 3 x len(BLADE_SRC) index images (16 * palette layer + colour) of the 3-step blade from Boss b (pals: its
+    4 x 16): frames len(BLADE_SRC) s + i, s 0 "\\", 1 "/", 2 X (the brighter colour where they cross)"""
+    import boss_look as L
+    lum = np.zeros(64)
+    for i, v in enumerate(np.asarray(pals, np.int64).reshape(-1)[:64]):
+        lum[i] = 3 * (v & 31) + 6 * (v >> 5 & 31) + (v >> 10 & 31)
+
+    def right_end(img, rows):
+        xs = np.nonzero(img[rows])[1]
+        return xs.max() if len(xs) else -1
+
+    def place(img, mid):   # on the 2C x 2C canvas, the source's box middle where it was
+        out = np.zeros((2 * L.C, 2 * L.C), np.uint8)
+        H = img.shape[0]
+        out[mid[1] - H // 2:mid[1] - H // 2 + H, mid[0] - BLADE_CW // 2:mid[0] + BLADE_CW // 2] = img
+        return out
+
+    pics = [[], [], []]
+    for f in BLADE_SRC:
+        src = b.compose(f)
+        d, mid = blade_warp(src, BLADE_K)
+        H = d.shape[0]
+        target = right_end(d, slice(H - 4, H))
+        lo, hi = 0.0, 1.5
+        for _ in range(30):   # the hook whose top end reaches the "\\"'s bottom end
+            m = (lo + hi) / 2
+            if right_end(blade_warp(src, -BLADE_UK, m, BLADE_T0)[0], slice(0, 4)) < target:
+                lo = m
+            else:
+                hi = m
+        u = blade_warp(src, -BLADE_UK, lo, BLADE_T0)[0]
+        x = np.where((u > 0) & ((d == 0) | (lum[u] > lum[d])), u, d)
+        pics[0].append(place(d, mid))
+        pics[1].append(place(u, mid))
+        pics[2].append(place(x, mid))
+    return pics[0] + pics[1] + pics[2]
+
+
 def giga_pictures_hud():
     """GIGA_PICS / GIGA_ROT -> {k: [(name, [index image (16 * palette layer + colour) per picture])]}"""
     import boss_look as L
@@ -984,6 +1156,13 @@ def giga_pictures_hud():
             out[k].append((name, imgs))
             if name in GIGA_MIRROR:   # (x -> 2C - x: the same center)
                 out[k].append((name + '_R', [np.roll(i[:, ::-1], 1, axis=1) for i in imgs]))
+    b3 = L.Boss(dat, L.BOSSES[3])
+    blades = blade_pictures(b3, b3.pals)   # (Heatnix's 3-step blade, his own palettes; facing right too)
+    out.setdefault(3, []).append(('SLASH', blades))
+    out[3].append(('SLASH_R', [np.roll(i[:, ::-1], 1, axis=1) for i in blades]))
+    floor, ceil, _ = magma_pictures()   # (Heatnix's Magma Stream: palette layer 0, its own CLUT at run time)
+    out.setdefault(3, []).append(('FLAMEF', floor))
+    out[3].append(('FLAMEC', ceil))
     for k, specs in GIGA_ROT.items():
         b = L.Boss(dat, L.BOSSES[k])
         for name, t, pics in specs:
@@ -1024,6 +1203,7 @@ def hud_looks(arc, pat_name, hud):
         for s, img in enumerate(icons[k]):
             icon_tile[k, s] = len(tiles)
             tiles.append(img)
+    tile_of = {}
     giga_parts = {}   # (k, name) -> [parts per picture]: a plain 16 px grid per palette layer (drawn unmirrored only:
     # the DLL keeps their facing 0, so no mirrored-view layout as boss_look.retile's)
     for k, specs in sorted(giga.items()):
@@ -1040,8 +1220,12 @@ def hud_looks(arc, pat_name, hud):
                             src = lay[ty:ty + 16, tx:tx + 16]
                             t[:src.shape[0], :src.shape[1]] = src
                             if t.any():
-                                fr.append((len(tiles) >> 8 | layer << 2, len(tiles) & 0xff, tx - L.C, ty - L.C))
-                                tiles.append(t)
+                                key = t.tobytes()   # (the same tile once: the flames repeat a few tiles)
+                                if key not in tile_of:
+                                    tile_of[key] = len(tiles)
+                                    tiles.append(t)
+                                i = tile_of[key]
+                                fr.append((i >> 8 | layer << 2, i & 0xff, tx - L.C, ty - L.C))
                 fl.append(fr)
             giga_parts[k, name] = fl
     assert len(tiles) <= 1024, len(tiles)
@@ -1090,6 +1274,8 @@ def hud_header(slot, hud):
         for name, imgs in specs:
             L += ['#define GIGA_%s %d   /* boss %d */' % (name, f, k), '#define GIGA_%s_N %d' % (name, len(imgs))]
             f += len(imgs)
+    L += ['static const unsigned short heat_flame_pal[16] = {%s};   /* Heatnix\'s Magma Stream (flame_pictures) */'
+          % ', '.join('0x%04x' % v for v in magma_pictures()[2])]
     L += ['static const unsigned short hud_pals[9][%d][16] = {' % (2 * len(HUD_LEVELS))]
     for k in range(9):
         L.append('    {%s},' % ', '.join('{%s}' % ', '.join('0x%04x' % v for v in p) for lv in pals[k] for p in lv))
@@ -1207,10 +1393,10 @@ def header(bosses, slots, fx_slot, menu_pals, flash_slot):
         assert len(bo['poses']) <= 64
         lift = ', '.join(str(l) for _, _, l, _ in bo['poses'])
         push = ', '.join(str(d) for _, _, _, d in bo['poses'])
-        L.append('    {%d, %d, %d, %s, %s, %s, %s, %s, %s, %s, %s, {%s}, {%s}, %s},   /* %d %s: %d poses */' % (
+        L.append('    {%d, %d, %d, %s, %s, %s, %s, %s, %s, %s, %s, {%s}, {%s}, %s, %s},   /* %d %s: %d poses */' % (
             ti, ps, pal, seq('idle'), seq('fire'), seq('atk', bo['atk_at']), seq('move', bo['loops']['move']), seq('alt', bo['loops']['alt']),
             ', '.join(seq(q, bo['loops'][q]) for q in MOTIONS), ', '.join(seq(q, HOLD) for q in EXTRAS),
-            ', '.join(seq(q, 0 if q == 'idle2' else HOLD) for q in ALTS), lift, push, seq('toss', HOLD),
+            ', '.join(seq(q, 0 if q == 'idle2' else HOLD) for q in ALTS), lift, push, seq('toss', HOLD), seq('giga', HOLD),
             bosses.index(bo) + 1, bo['name'],
             len(bo['poses'])))
     # boss-size collision (2026-10-26): the hurt box {dx, dy, w, h} of the idle pose (X's: -10, -17, 19 x 38, the feet

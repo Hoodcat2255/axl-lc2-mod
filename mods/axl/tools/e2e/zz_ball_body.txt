@@ -1,0 +1,23 @@
+# Probe (user report 2026-11-12: the charged ball bursts on his own body): changed into Heatnix away from enemies,
+# a full charge let go (the ball thrown right), then the plain dash right into it; log 'heat charge burst ... (hit H
+# terrain T t N)' tells what burst it.
+all_weapons
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 200 1060 4
+idle 40
+pset 14C 3
+press 4 S
+idle 100
+press 2 RIGHT
+idle 10
+hold X
+idle 70
+release
+idle 22
+press 3 A RIGHT
+idle 60
+end

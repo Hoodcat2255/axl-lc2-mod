@@ -1,0 +1,26 @@
+# Heatnix's thrown fireballs on video (user report 2026-11-12: "they should fall on an arc"; axl_dna_bosses.c
+# hf_throw_speed): changed into Heatnix, a throw left (no enemy: 96 px ahead), one up high, then right at the intro's
+# first enemy. Run with lc2_test.py --video; the last seconds show the arcs.
+all_weapons
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1060 4
+idle 40
+pset 14C 3
+press 4 S
+idle 100
+press 2 LEFT
+idle 10
+press 3 X
+idle 70
+press 40 UP
+press 3 X
+idle 90
+press 2 RIGHT
+idle 10
+press 3 X
+idle 80
+end

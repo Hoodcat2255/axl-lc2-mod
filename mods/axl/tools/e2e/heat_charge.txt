@@ -1,0 +1,152 @@
+# Heatnix's shots (user requests 2026-11-12; axl_dna_bosses.c heat_charge / hc_*, axl_moves.c): changed into Heatnix
+# near the intro's first enemy (on the right of the spot). The charge first: held 70 frames facing left (the press's
+# small fireball flies left, away from the enemy; X's glow snapped at 30 and 70), turned right and let go full, the
+# shot motion spits the big fireball (1 projectile) that bursts into 3 shards on the enemy (4 since the mark; log
+# 'heat charge burst', hpwatch: id 0c). Then a press: the small fireball and its blast where it lands (2; heat_blasts); held 40 frames (short of the full 60):
+# only the press's (2); mashing high up: never more than 3 of them out (dna_shots); the special button: the crescent (1, log 'second attack 3'). The dash: a tap, the plain
+# X-style dash at the press (20 frames at 6 px/f: about 120 px, log 'heat dash'); held 65 frames (charging) and let go right, the God
+# Bird (log 'heat dash let go (god bird)', 'move 3 start'; 8 px/f, walls may stop it: more than the plain dash's).
+all_weapons
+hpwatch 7990
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1080 4
+idle 40
+pset 14C 3
+press 4 S
+idle 100
+press 2 LEFT
+idle 10
+log heat_charge
+hold X
+idle 30
+log snap_charge_30
+snap
+press 2 RIGHT X
+hold X
+idle 38
+log snap_charge_70
+snap
+release
+mark
+idle 30
+show shots
+expect shots >= 1 b3_charge_ball
+log snap_ball
+snap
+idle 50
+show shots
+expect shots >= 4 b3_charge_burst
+log snap_burst
+snap
+idle 60
+log heat_tap
+mark
+press 3 X
+idle 90
+show shots heat_blasts
+expect shots == 2 b3_tap_one_ball_one_blast
+expect heat_blasts >= 2 b3_tap_blast_on_floor
+idle 10
+log heat_short_hold
+mark
+hold X
+idle 40
+release
+idle 90
+show shots
+expect shots >= 1 b3_short_hold_one_ball
+expect shots <= 2 b3_short_hold_no_ball
+idle 20
+log heat_limit
+press 100 UP
+mark
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+press 2 X
+idle 10
+show shots dna_shots
+expect dna_shots <= 3 b3_three_at_most
+expect shots >= 2 b3_mash_throws
+idle 240
+log heat_special
+mark
+press 2 S
+idle 30
+show shots
+expect shots == 1 b3_special_crescent
+log snap_crescent
+snap
+idle 30
+log heat_dash_tap
+goto 360 1060 4
+idle 20
+press 2 LEFT
+idle 10
+mark
+press 3 A
+idle 10
+log snap_dash_ghosts
+snap
+idle 20
+show dx
+expect dx <= -100 b3_dash_tap_lo
+expect dx >= -140 b3_dash_tap_hi
+idle 20
+log heat_dash_charge
+goto 360 1060 4
+idle 20
+press 2 RIGHT
+idle 10
+hold A
+idle 65
+log snap_dash_charged
+snap
+release
+mark
+idle 10
+log snap_god_bird
+snap
+idle 40
+show dx
+expect dx >= 140 b3_god_bird
+end

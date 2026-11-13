@@ -1,0 +1,32 @@
+# Probe (2026-11-12): Heatnix's fire immunity - stage 3 checkpoint 8 (X died walking right from there: the death tile at
+# about 1680 1627), changed into Heatnix, the bot right: logs 'death tile', 'death tile kill ... lava, none', 'hurt by'.
+all_weapons
+seq
+include to_stage_select
+set 48 3
+set 49 0
+press 4 Z
+talk 6000 free == 1
+god on
+energy full
+set 59 8
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+show stage area checkpoint px py
+pset 14C 3
+press 4 S
+idle 100
+log walk
+bot right
+idle 600
+bot off
+show px py lava_blocked fire_blocked
+log snap_end
+snap
+idle 200
+show px py lava_blocked fire_blocked
+log snap_end2
+snap
+end

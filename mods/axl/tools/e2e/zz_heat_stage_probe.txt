@@ -1,0 +1,52 @@
+# Probe (2026-11-12, the Magma Stream giga's flame pictures): to Heatnix's stage (3, area 0; area 1 crashed the load) from the stage select,
+# then every checkpoint 1-4 by a respawn there (set 59 N, hit points 0): a snap and the place at each, the objects
+# (objs) - to find the boss room. god keeps him up.
+seq
+include to_stage_select
+set 48 3
+set 49 0
+press 4 Z
+talk 6000 free == 1
+god on
+show stage area checkpoint px py
+log snap_cp_start
+snap
+objs
+idle 60
+set 59 1
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+show stage area checkpoint px py
+log snap_cp1
+snap
+objs
+set 59 2
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+show stage area checkpoint px py
+log snap_cp2
+snap
+objs
+set 59 3
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+show stage area checkpoint px py
+log snap_cp3
+snap
+objs
+set 59 4
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+show stage area checkpoint px py
+log snap_cp4
+snap
+objs
+end

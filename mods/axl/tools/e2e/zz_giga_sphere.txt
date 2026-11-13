@@ -1,0 +1,2913 @@
+# Probe (2026-11-14): Axl's Giga Crush on the Heatnix stage's red sphere (Nightmare Snake: hurt at its core only) - stage 3 forced (zz_lava_probe's preamble), the bot fights it a while (its hurt spot learned), then the Giga Crush 10 times (the sphere rolls off the screen and back); 'giga target' lines and its hit points.
+all_weapons
+hpwatch 9800
+seq
+wait free == 1 9000
+set 4B 1
+talk 6000 stage == 15
+idle 500
+press 4 A
+idle 120
+press 4 DOWN
+idle 30
+press 4 Z
+wait stage == 11 600
+talk 4000 stage == 13
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+set 48 3
+set 49 0
+press 2 Z
+idle 2
+wait free == 1 6000
+show stage
+god on
+bot right
+idle 650
+bot off
+show boss_hp
+pset 1A0 E8
+pset 1A1 2
+press 2 V
+idle 10
+press 2 V
+idle 10
+press 2 V
+idle 150
+snap
+pset 1A0 E8
+pset 1A1 2
+press 2 V
+idle 10
+press 2 V
+idle 10
+press 2 V
+idle 150
+snap
+pset 1A0 E8
+pset 1A1 2
+press 2 V
+idle 10
+press 2 V
+idle 10
+press 2 V
+idle 150
+snap
+pset 1A0 E8
+pset 1A1 2
+press 2 V
+idle 10
+press 2 V
+idle 10
+press 2 V
+idle 150
+snap
+pset 1A0 E8
+pset 1A1 2
+press 2 V
+idle 10
+press 2 V
+idle 10
+press 2 V
+idle 150
+snap
+pset 1A0 E8
+pset 1A1 2
+press 2 V
+idle 10
+press 2 V
+idle 10
+press 2 V
+idle 150
+snap
+pset 1A0 E8
+pset 1A1 2
+press 2 V
+idle 10
+press 2 V
+idle 10
+press 2 V
+idle 150
+snap
+pset 1A0 E8
+pset 1A1 2
+press 2 V
+idle 10
+press 2 V
+idle 10
+press 2 V
+idle 150
+snap
+pset 1A0 E8
+pset 1A1 2
+press 2 V
+idle 10
+press 2 V
+idle 10
+press 2 V
+idle 150
+snap
+pset 1A0 E8
+pset 1A1 2
+press 2 V
+idle 10
+press 2 V
+idle 10
+press 2 V
+idle 150
+snap
+end

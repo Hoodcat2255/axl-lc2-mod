@@ -64,7 +64,8 @@ def grab(path):
 def monitor_source():
     """the default output's monitor (PulseAudio / PipeWire): the game's sound"""
     out = subprocess.run(['ffmpeg', '-hide_banner', '-sources', 'pulse'], capture_output=True, text=True).stdout
-    m = re.search(r'^\*?\s*(\S+\.monitor)', out, re.M)
+    m = re.search(r'^\*\s*(\S+\.monitor)', out, re.M) or re.search(r'^\s*(\S+\.monitor)', out, re.M)   # (the
+    # starred one, the default: the first was HDMI's while the game played on a headset - silent, 2026-11-12)
     return m.group(1) if m else None
 
 

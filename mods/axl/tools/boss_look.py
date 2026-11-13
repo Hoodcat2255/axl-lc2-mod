@@ -69,13 +69,25 @@ BOSSES = {
     3: dict(name='Heatnix', dat=77, x0=512, base=0x140, base1=0x440, pal=(7, 0x1300), scale=1,
             idle=((11, 2), (10, 1), (9, 0), (9, 3)),                # anim 0
             fire=(),
-            atk=((14, 27), (3, 28), (1, 29), (4, 30), (11, 31), (1, 31)), atk_at=18,   # anim 6: straight shot
+            # the shot button: anim 5, the thrown fireball's (sub 4, t=26; user request 2026-11-12: the fireballs with
+            # the boss's own throw and arc - anim 6, the crescent's, went to the special)
+            atk=((10, 21), (14, 22), (3, 23), (1, 24), (2, 25), (15, 26)), atk_at=26,
             # the firebird (sub 8, user request 2026-10-27): table 0x800FE858 anim 4 = parts table 1 pictures 15-17
             move=((10, TABLE1 + 15), (10, TABLE1 + 16), (10, TABLE1 + 17)),
             # (its head was 120 px ahead of him - user report 2026-10-28: moved 100 px back, the head now just ahead;
             # the tail's last 100 px past the parts' byte range cut off)
             shift={TABLE1 + 15: 100, TABLE1 + 16: 100, TABLE1 + 17: 100},
-            alt=((10, 21), (14, 22), (3, 23), (1, 24), (2, 25), (15, 26)),   # anim 5: the thrown fireball (sub 4, t=26)
+            alt=((14, 27), (3, 28), (1, 29), (4, 30), (11, 31), (1, 31)),   # anim 6: the crescent (the special since
+            # 2026-11-12, t=18; anim 5 - the thrown fireball's, t=26 - was it before: now the shot button's)
+            # the plain dash's (user report 2026-11-12: the level flight's first picture, 11 - wings up - smeared its
+            # afterimages): 14, wings level, held (axl_moves.c moves_look 7 while it runs)
+            cdash=((4, 14),),
+            # the giga (Magma Stream, user request 2026-11-12): BIN 35 anim table 0x800FE7DC anim 7 - pictures 32-38,
+            # the fire gathered in his hands, held at the last
+            giga=((20, 32), (10, 33), (15, 34), (2, 35), (4, 36), (18, 37), (14, 38)),
+            # the 3-step blade's first two steps (user request 2026-11-12, the user's drawings: lc2_dna.DRAWN_POSES):
+            # the left wing's swing, the right wing's (wind-up 8, the swing 14: the blade at t = 8, axl_moves.c)
+            cshot=((8, 2000), (14, 2001)), leap=((8, 2002), (14, 2003)),
             walk=((11, 11), (8, 14), (1, 12), (9, 12), (9, 13)), walk_loop=1,   # anim 2: level flight
             jump=((3, 15), (3, 16)), jump_loop=0,                   # anim 3: flying up
             fall=((10, 19), (8, 20), (1, 17), (9, 17), (9, 18)), fall_loop=1),  # anim 4: flying down
@@ -300,7 +312,7 @@ def edits():
     return {'looks': e.get('looks', {}), 'nudge': e.get('nudge', {})}
 
 
-EDIT_SEQS = ('idle', 'fire', 'atk', 'alt', 'move')   # the viewer's editable sequences (2026-10-29: + attack, second
+EDIT_SEQS = ('idle', 'fire', 'atk', 'alt', 'move', 'cshot', 'leap')   # the viewer's editable sequences (2026-10-29: + attack, second
                                                      # attack, dash - picked from the boss's own anims or by hand)
 
 

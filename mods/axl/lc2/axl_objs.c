@@ -105,6 +105,9 @@ char *objs_boss(void)
 }
 
 /* test (objs): the live objects' types 0x30 and up, each once, with its sub-type and hit points (one line) */
+static int alive(char *o);
+static int immune_table(unsigned t);
+
 void objs_types(void)
 {
     char line[512] = "e2e objs";
@@ -113,9 +116,10 @@ void objs_types(void)
     for (k = 0; k < N_POOLS && n < 480; k++)
         for (i = 0; i < n_objs[k] && n < 480; i++) {
             o = objs[k][i];
-            if (O8(o, 8) && O8(o, 9) >= 0x30)
-                n += wsprintfA(line + n, " %d:%02x.%02x/%d@%d,%d", k, O8(o, 9), O8(o, 10), O8(o, 0x84), (int)PX(o),
-                               (int)PY(o));   /* (wsprintf has no %f) */
+            if (O8(o, 8) && (O8(o, 9) >= 0x30 || ((TARGET_POOLS >> k & 1) && alive(o))))
+                n += wsprintfA(line + n, " %d:%02x.%02x/%d%s@%d,%d", k, O8(o, 9), O8(o, 10), O8(o, 0x84),
+                               immune_table(*(volatile unsigned *)(o + 0x80)) ? "!" : "", (int)PX(o),
+                               (int)PY(o));   /* (wsprintf has no %f; "!": the buster cannot hurt it) */
         }
     test_log("%s", line);
 }
@@ -490,6 +494,105 @@ void objs_log_near(float x, float y, int r, int id)
         }
 }
 
+/* Aim where it hurts (user decision 2026-11-13, docs/research-axl-autoaim-weakpoint-20261113.md: one rule for every
+ * enemy, no per-enemy cases): when a target's hit points drop, the player's attack that was there the frame before and
+ * is gone now (else the nearest one) shows where it got hurt - kept as an offset from the target (left / right
+ * turned with its facing) for LEARN_LIFE frames; the homing and the bosses' aim go there (objs_aim_at), else to the
+ * hurt box's middle as before */
+#define LEARN_LIFE 120
+#define LEARN_NEAR 128
+#define N_PB 64
+static char *learn_obj[N_POOLS][PER_POOL];
+static float learn_dx[N_POOLS][PER_POOL], learn_dy[N_POOLS][PER_POOL];
+static unsigned learn_at[N_POOLS][PER_POOL];
+static unsigned char learn_face[N_POOLS][PER_POOL];
+static struct { char *w; float x, y; } pb[N_PB];
+static int n_pb;
+
+static void learn_hit(int k, int i, char *o)
+{
+    int j, best = -1, gone, best_gone = 0;
+    float bd = (float)LEARN_NEAR * LEARN_NEAR, dx, dy, d;
+
+    for (j = 0; j < n_pb; j++) {
+        dx = pb[j].x - PX(o);
+        dy = pb[j].y - PY(o);
+        d = dx * dx + dy * dy;
+        if (d > (float)LEARN_NEAR * LEARN_NEAR)
+            continue;
+        gone = !O8(pb[j].w, 8) || (PX(pb[j].w) - pb[j].x) * (PX(pb[j].w) - pb[j].x) > 32 * 32;
+        if ((gone && !best_gone) || (gone == best_gone && d < bd)) {
+            best = j;
+            bd = d;
+            best_gone = gone;
+        }
+    }
+    if (best < 0)
+        return;
+    learn_obj[k][i] = o;
+    learn_dx[k][i] = pb[best].x - PX(o);
+    learn_dy[k][i] = pb[best].y - PY(o);
+    learn_at[k][i] = hp_frames;
+    learn_face[k][i] = O8(o, 0x29) & 0x40;
+    if (test_on)
+        test_log("aim learn %02x.%02x hp %d: hurt at %+.0f %+.0f (attack %02x.%02x %s)", O8(o, 9), O8(o, 10), O8(o, 0x84),
+                 learn_dx[k][i], learn_dy[k][i], O8(pb[best].w, 9), O8(pb[best].w, 10), best_gone ? "gone" : "nearest");
+}
+
+static void pb_snapshot(void)
+{
+    int j;
+    n_pb = 0;
+    for (j = 0; j < n_objs[4] && n_pb < N_PB; j++)
+        if (O8(objs[4][j], 8)) {
+            pb[n_pb].w = objs[4][j];
+            pb[n_pb].x = PX(objs[4][j]);
+            pb[n_pb].y = PY(objs[4][j]);
+            n_pb++;
+        }
+}
+
+/* where to aim at target e: 1 and (x, y) where it was last hurt (recently), 0 none */
+int objs_aim_at(char *e, float *x, float *y)
+{
+    int k, i;
+    float dx;
+    for (k = 0; k < N_POOLS; k++) {
+        if (!(GUARD_POOLS >> k & 1))
+            continue;
+        for (i = 0; i < n_objs[k]; i++)
+            if (objs[k][i] == e) {
+                if (learn_obj[k][i] != e || hp_frames - learn_at[k][i] > LEARN_LIFE || !O8(e, 8))
+                    return 0;
+                dx = learn_dx[k][i];
+                if ((O8(e, 0x29) & 0x40) != learn_face[k][i])
+                    dx = -dx;
+                *x = PX(e) + dx;
+                *y = PY(e) + learn_dy[k][i];
+                return 1;
+            }
+    }
+    return 0;
+}
+
+/* the point to aim at on target e (every aim of Axl and the changed bosses): where it was last hurt (lately), else
+ * its hurt box's middle (box {vtable, dx, dy, w, h}; facing right mirrors dx), else its place */
+void objs_aim_point(char *e, float *x, float *y)
+{
+    const signed char *b = *(const signed char *const *)(e + 0x7C);
+    float bx;
+
+    if (objs_aim_at(e, x, y))
+        return;
+    *x = PX(e);
+    *y = PY(e);
+    if (!b)
+        return;
+    bx = (float)b[4] + (unsigned char)b[6] * 0.5f;
+    *x += (O8(e, 0x29) & 0x40) ? -bx : bx;
+    *y += (float)b[5] + (unsigned char)b[7] * 0.5f;
+}
+
 void objs_hp_frame(void)
 {
     int k, i;
@@ -509,6 +612,9 @@ void objs_hp_frame(void)
             hp = O8(o, 8) ? *(volatile unsigned short *)(o + 0x84) : 0;
             if (hp < hp_seen[k][i])
                 hurt_at[k][i] = hp_frames;
+            if (O8(o, 8) && (TARGET_POOLS >> k & 1) && (unsigned char)hp < (unsigned char)hp_seen[k][i] &&
+                (unsigned char)hp)
+                learn_hit(k, i, o);   /* (the hit points: the low byte; a beaten one has no weak point to find) */
             if (O8(o, 8)) {
                 hurt_x[k][i] = PX(o);
                 hurt_y[k][i] = PY(o);
@@ -516,6 +622,7 @@ void objs_hp_frame(void)
             hp_seen[k][i] = hp;
         }
     }
+    pb_snapshot();
 }
 
 /* (the guard-break bullet's end: the target pools only, as in 0.0.5 - with pool 10 (GUARD_POOLS, 2026-11-07) it ended

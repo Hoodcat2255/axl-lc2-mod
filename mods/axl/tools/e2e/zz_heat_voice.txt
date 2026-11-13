@@ -1,0 +1,33 @@
+# Heatnix's voices by ear (user request 2026-11-12; lc2_build HEAT_VOICES, pl00 requests 14 / 15): changed into
+# Heatnix, a shot ("Ha!", 'voice 9'), the special ("Teya!", 'voice 12'), the charged dash ("God Bird!", log 'voice 14'), then the giga with a full giga gauge ("Magma Stream!",
+# 'voice 15'). Run with lc2_test.py --video to hear them (zz_: not in the plain e2e set's checks of the game state).
+all_weapons
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1060 4
+idle 40
+pset 14C 3
+press 4 S
+idle 100
+press 2 LEFT
+idle 10
+log voice_ha
+press 3 X
+idle 60
+log voice_teya
+press 2 S
+idle 60
+log voice_godbird
+hold A
+idle 65
+release
+idle 90
+log voice_magma
+pset 1A0 40
+pset 1A1 2
+press 2 V
+idle 150
+end

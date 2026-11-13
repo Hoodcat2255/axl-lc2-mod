@@ -84,7 +84,7 @@ static int oneup_anim(char *o)
         char *e = tbl[a];
         if (!readable(e, 8))
             break;
-        if (len < 360)
+        if (test_on && len < 360)   /* (the log line only) */
             len += wsprintfA(line + len, " %d:%d", a, (unsigned char)e[7]);
         if ((unsigned char)e[7] == 96 && found < 0)
             found = a;

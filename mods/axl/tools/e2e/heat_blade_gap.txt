@@ -1,0 +1,57 @@
+# Heatnix's blade pace (user request 2026-11-13; axl_moves.c SLASH_GAP 20): the special mashed every 4 frames - no more
+# than 2 blades in the first 60 frames (was one every 9), the kept press still makes the 3rd (the X) by frame 110.
+all_weapons
+hpwatch 7990
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1060 4
+idle 40
+pset 14C 3
+press 4 S
+idle 100
+press 2 RIGHT
+idle 10
+log heat_hit_once
+idle 90
+log heat_blade_gap
+mark
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+press 2 S
+idle 2
+show shots
+expect shots <= 2 b3_blade_gap
+expect shots >= 1 b3_blade_first
+idle 50
+show shots
+expect shots >= 3 b3_blade_kept_press
+end

@@ -1,0 +1,35 @@
+# The charge glow's colours per boss (user request 2026-11-12; axl_dna.c dna_charge_palette): Axl's copy-shot charge
+# (special held, not changed: red) and Heatnix's shot charge (orange), snapped at stage 1 and full; logs 'charge
+# palette' and the low CLUT slots ('clut'). (A first try on the sparks' own W+0x5E slots 0x2C / 0x1FB did nothing.)
+all_weapons
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1060 4
+idle 40
+log probe_axl
+hold S
+idle 50
+log snap_axl_stage1
+snap
+idle 50
+log snap_axl_full
+snap
+release
+idle 60
+pset 14C 3
+press 4 S
+idle 100
+log probe_heat
+hold X
+idle 45
+log snap_heat_stage1
+snap
+idle 30
+log snap_heat_full
+snap
+release
+idle 60
+end

@@ -1,0 +1,43 @@
+# Heatnix's Magma Stream giga (user requests 2026-11-12; axl_dna_bosses.c giga_heatnix, dna_magma_late): changed into
+# Heatnix near the intro's first enemy, the giga gauge full, the giga button: the purple flames come down from the top
+# and up from the bottom (4 screen strips: magma_shown 15) until they meet, stay, go back; the enemy on the screen
+# burns (magma_kills, log 'giga 3 magma: enemy'); his own hurt box is off meanwhile; the flames gone at the end.
+all_weapons
+hpwatch 7990
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1080 4
+idle 40
+pset 14C 3
+press 4 S
+idle 100
+press 2 RIGHT
+idle 10
+log heat_magma
+pset 1A0 40
+pset 1A1 2
+mark
+press 2 V
+idle 12
+log snap_magma_12
+snap
+idle 18
+log snap_magma_30
+snap
+show magma_shown
+expect magma_shown == 15 b3_magma_four_strips
+idle 30
+log snap_magma_60
+snap
+show magma_kills
+expect magma_kills >= 1 b3_magma_burns
+idle 40
+log snap_magma_100
+snap
+idle 40
+show magma_shown
+expect magma_shown == 0 b3_magma_gone
+end

@@ -1,0 +1,54 @@
+# Probe (2026-11-13): the Heatnix stage's Nightmare Snake (aim at its core): stage 3 from its start, the bot walks
+# right, the objects (types, hit points, "!" = buster-immune) logged every 150 frames with a snap.
+all_weapons
+hpwatch 9500
+objdump 9717
+objdump 10017
+objdump 10767
+seq
+include to_stage_select
+set 48 3
+set 49 0
+press 4 Z
+talk 6000 free == 1
+god on
+energy full
+bot right
+idle 150
+objs
+snap
+idle 150
+objs
+snap
+idle 150
+objs
+snap
+idle 150
+objs
+snap
+idle 150
+objs
+snap
+idle 150
+objs
+snap
+idle 150
+objs
+snap
+idle 150
+objs
+snap
+idle 150
+objs
+snap
+idle 150
+objs
+snap
+idle 150
+objs
+snap
+idle 150
+objs
+snap
+bot off
+end

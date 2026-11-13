@@ -1,0 +1,18 @@
+# Probe (user report 2026-11-12: the parts not taken - a misplaced else cleared their flags every frame): the parts
+# the mod reads put in the worn word st + 0xB0 = 0x001C0120 (Energy Saver 0x20, Speed Shot 0x100, Rapid 5 0x40000,
+# Ultimate Buster 0x80000, Quick Charge 0x100000): 8 shots (log 'bullet N guard G rapid R pierce P'),
+# then the special once (the Ultimate Buster: the copy shot at once, log 'copy charge let go').
+seq
+wait free == 1 9000
+god on
+set B0 20
+set B1 1
+set B2 1C
+idle 30
+hold X
+idle 50
+release
+idle 20
+press 2 S
+idle 40
+end

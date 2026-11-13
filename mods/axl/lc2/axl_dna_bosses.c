@@ -50,8 +50,7 @@ static void aim_point(char *p, int range, int ahead, float *tx, float *ty)
     char *e = find_target(gun_x(p), gun_y(p), range);
 
     if (e) {
-        *tx = PX(e);
-        *ty = PY(e);
+        objs_aim_point(e, tx, ty);   /* (where it was last hurt, if lately, else its hurt box: axl_objs.c) */
     } else {
         *tx = gun_x(p) + SX(p) * ahead;
         *ty = gun_y(p);
@@ -623,22 +622,310 @@ void dna_wolfang(char *p, int t, int fire, int fire_new)
     CD(40);
 }
 
-/* ---- 3 Blaze Heatnix: straight shot 5 px/f through walls, box 16 x 46 (boss BIN 35 sub 0) -------------- */
-static const signed char box_hshot[4] = {-8, -23, 16, 46};
+/* ---- 3 Blaze Heatnix: the small fireball 5 px/f, charged: the big one bursting in 3 (the crescent - BIN 35 sub 0 -
+ * is the special's, axl_moves.c) ------------------------------------------------------------------------------- */
+static const signed char box_hsmall[4] = {-10, -10, 20, 20};
+
+/* The charged shot (user request 2026-11-12: "a press spits the small one, a charge the boss's big fireball, which
+ * splits in 3 where it hits"): a press plays the shot motion with the small fireball; the shot button held
+ * charges (X's charge glow and sound, axl_x.c), let go when full the same motion spits his thrown fireball at full
+ * size (BIN 35 sub 4's picture 51-54, about 48 px: GIGA_BIGFIRE) straight ahead at HC_SPEED; on an enemy, a wall or
+ * the floor it bursts into 3 shards (parts table 1 pictures 3-6: GIGA_SPARK) at 5 px/f, the original's upper fan.
+ * The charged damage id (X's charged Magma Blade, GID_HEAT) for the ball, the shot's for the shards. While a move or
+ * the giga holds him the button reads as up (axl_x.c): the charge waits, the release counts after. */
+#define HC_STAGE1 30
+#define HC_FULL 60
+#define HC_SOUND_AT 25
+#define HC_LIFE 150
+#define HC_WALL_T 6   /* frames before a wall bursts it */
+#define HC_PASS 10   /* frames near an enemy without a hit: the burst anyway */
+#define HC_NEAR 40   /* px from an enemy's origin: the burst (as objs_hp_frame's "shots near") */
+#define HC_ID 0x0C   /* (= GID_HEAT, below) */
+static const signed char box_bigfire[4] = {-20, -20, 40, 40};
+static const signed char box_spark[4] = {-6, -6, 12, 12};
+static int hc_hold;   /* frames the shot button has been held */
+static int hc_want;   /* a motion to start: 1 the shot, 2 the charged ball */
+static int hc_big;    /* the motion under way spits the ball */
+static int hc_cur_big;   /* the motion under way is the charged throw (until it ends) */
+
+/* the throw (user requests 2026-11-12: his motion and arc; "it should fall on an arc", the boss's own - vy -1/16,
+ * gravity 0x1000, BIN 35 FD2D4 - dropped it nearly straight from Axl's height): lobbed from 16 px ahead, 24 up onto
+ * the target (none, or behind him: HF_AHEAD px ahead at his feet' height) in HF_T frames under gravity HF_G (as the
+ * giga's, giga_heatnix): vx = dx / T (at most 4 px/f), up speed (y - ty) / T + g T / 2 (1.5 - 4 px/f) */
+#define HF_T 36
+#define HF_G 0x2000
+#define HF_AHEAD 96
+static void hf_throw_speed(char *p, float x, float y, int *vx, int *vy)
+{
+    float tx, ty;
+
+    aim_point(p, 240, HF_AHEAD, &tx, &ty);
+    if ((tx - x) * SX(p) < 8) {
+        tx = x + SX(p) * HF_AHEAD;
+        ty = PY(p);
+    }
+    *vx = clampi((int)((tx - x) * 65536) / HF_T, FXP(-4), FXP(4));
+    *vy = clampi((int)(((y - ty) / HF_T + (HF_G / 65536.0f) * HF_T / 2) * 65536), FXP(1.5), FXP(4));
+}
+
+/* the small fireball (user request 2026-11-12: "not gone until it lands, and a blast where it does"): falls on its
+ * arc through the enemies (each hit once) until the floor or off the screen, a wall stops it going sideways; on the floor one of
+ * the game's explosions (axl_x.c axl_boom_fn, 32 x 32, the shot's damage) and it is gone (or after HS_LIFE: a pit) */
+#define HS_LIFE 300
+static const signed char box_hsblast[4] = {-16, -16, 32, 32};
+static int heat_blasts;   /* test: the small fireballs that went off */
+
+/* one hit an enemy (user request 2026-11-12: "no multi-hits from the fireballs" - the game's hit number did not stop
+ * a piercing one hitting the enemy it stayed on every frame, 12 -> 6 -> 0 in two frames; nor does the game mark the
+ * hit on a piercing one, W+0xD4, e2e heat_hits): the nearest enemy within ONCE_NEAR px and its hit points are kept
+ * each frame (q->a, q->b); the same one with fewer now = hit: the attack box goes off until no enemy is that near,
+ * then back on for the next one. q->d: off. */
+#define ONCE_NEAR 40
+#define HP_OF(e) (*(volatile unsigned short *)((e) + 0x84))
+static void hit_once(char *w, proj *q, const signed char *box)
+{
+    char *list[1];
+    char *e = objs_targets(PX(w), PY(w), ONCE_NEAR, ONCE_NEAR, list, 1) ? list[0] : 0;
+
+    if (!q->d && e && (char *)q->a == e && HP_OF(e) < (unsigned)q->b) {
+        q->d = 1;
+        proj_nobox(w);
+        if (test_on)
+            test_log("heat hit once: %p box off at %.0f %.0f (hp %d -> %d)", w, PX(w), PY(w), q->b, HP_OF(e));
+    } else if (q->d && !e) {
+        q->d = 0;
+        proj_box(w, box);
+    }
+    q->a = (int)e;
+    q->b = e ? HP_OF(e) : 0;
+}
+
+/* the small fireball's blast: the game's explosion pictures, one hit an enemy */
+static void hs_blast(char *w, proj *q)
+{
+    axl_boom_fn(w, q);
+    if (q->w == w)
+        hit_once(w, q, box_hsblast);
+}
+
+static void hs_ball(char *w, proj *q)
+{
+    char *b;
+
+    if (dead_dna(w, 3))
+        return;
+    hit_once(w, q, box_hsmall);
+    if (TERR(w) & 3)                              /* (a wall: straight down from there) */
+        VX(w) = 0;
+    if (((TERR(w) & 8) && VY(w) < 0) || q->t >= HS_LIFE) {   /* (the floor only coming down: not where it starts) */
+        if (TERR(w) & 8) {
+            heat_blasts++;
+            b = proj_spawn(3, PX(w), PY(w) - 8, 0, 0, 1, 34, hs_blast, P_PIERCE | P_WALL | P_NOSCREEN);
+            if (b) {
+                proj_box(b, box_hsblast);
+                axl_boom_fn(b, proj_of(b));
+            }
+            if (test_on)
+                test_log("heat fireball blast at %.0f %.0f", PX(w), PY(w));
+        }
+        proj_kill(w);
+        return;
+    }
+    VY(w) -= HF_G;
+}
+
+static void hc_spark(char *w, proj *q)
+{
+    int f = GIGA_SPARK + (q->t / 3) % GIGA_SPARK_N;
+
+    if (dead_dna(w, 3))
+        return;
+    hit_once(w, q, box_spark);
+    if (q->c != f) {
+        q->c = f;
+        proj_pose_look(w, HUD_TEX_INDEX, HUD_PAT + 2, f);   /* (boss 3's HUD section) */
+    }
+}
+
+static void hc_burst(char *w)
+{
+    int used = 0, n = 0, k;
+    float a;
+    char *s;
+
+    while (n < 3) {                               /* 3 shards, at k * 15 degrees, k 1-11 all different */
+        k = 1 + rnd() % 11;
+        if (used >> k & 1)
+            continue;
+        used |= 1 << k;
+        n++;
+        a = k * 15 * 0.0174533f;
+        s = proj_spawn(3, PX(w), PY(w), (int)(cosf(a) * 5 * 65536), (int)(sinf(a) * 5 * 65536), k < 6, 40, hc_spark,
+                       P_PIERCE);
+        if (s) {
+            proj_of(s)->c = -1;
+            proj_box(s, box_spark);
+            proj_pose_look(s, HUD_TEX_INDEX, HUD_PAT + 2, GIGA_SPARK);
+        }
+    }
+    if (test_on)
+        test_log("heat charge burst at %.0f %.0f (hit %d terrain %x t %d)", PX(w), PY(w), proj_of(w)->got, TERR(w),
+                 proj_of(w)->t);
+    proj_kill(w);
+}
+
+static void hc_ball(char *w, proj *q)
+{
+    char *list[1];
+    int nearby;
+    /* the original's anim 10: 51, 52, 53, 54, then 52-54 over (10 frames each) */
+    int f = q->t < 40 ? q->t / 10 : 1 + (q->t - 40) / 10 % 3;
+
+    if (dead_dna(w, 3))
+        return;
+    /* an enemy hit (its own hit flag W+0xD4 never comes for the charged id: the game's charged weapons pass through -
+     * 2026-11-12 e2e: it hurt the first enemy twice and flew on; burst at once when near, it hurt nothing): an enemy
+     * near it and an enemy's hit points lost since last frame (its own hit landed), or near for HC_PASS frames (passing
+     * one it cannot hurt); a wall or the floor (the ceiling passed) */
+    nearby = objs_targets(PX(w), PY(w), HC_NEAR, HC_NEAR, list, 1);
+    q->b = nearby ? q->b + 1 : 0;
+    /* (the floor only coming down, a wall after HC_WALL_T frames: thrown on the ground the ball started in the floor and
+     * burst at once, at his feet - user report 2026-11-12, "on my own body") */
+    if (q->got > 0 || (nearby && axl_enemy_hits != q->a) || q->b >= HC_PASS || ((TERR(w) & 8) && VY(w) < 0) ||
+        ((TERR(w) & 3) && q->t > HC_WALL_T) || q->t >= HC_LIFE) {
+        hc_burst(w);
+        return;
+    }
+    q->a = axl_enemy_hits;
+    if (q->c != f) {
+        q->c = f;
+        proj_pose_look(w, HUD_TEX_INDEX, HUD_PAT + 2, GIGA_BIGFIRE + f);
+    }
+    VY(w) -= HF_G;                                /* (the throw's arc) */
+}
+
+/* at most HB_MAX of the shot's fireballs out (user request 2026-11-12: "not rapid fire, 3 at most"), as X's buster:
+ * a press or a full charge's release with HB_MAX out does nothing */
+#define HB_MAX 3
+static char *hb_out[HB_MAX];
+
+static int hb_count(void)
+{
+    int i, n = 0;
+    proj *q;
+    for (i = 0; i < HB_MAX; i++) {
+        q = hb_out[i] ? proj_of(hb_out[i]) : 0;
+        if (q && (q->fn == hs_ball || q->fn == hc_ball))
+            n++;
+        else
+            hb_out[i] = 0;
+    }
+    return n;
+}
+
+static void hb_add(char *w)
+{
+    int i;
+    hb_count();
+    for (i = 0; i < HB_MAX; i++)
+        if (!hb_out[i]) {
+            hb_out[i] = w;
+            return;
+        }
+}
+
+/* axl_dna.c dna_after, Heatnix (fire = shot held, fire_new = a new press, busy = a move or the giga holds him):
+ * 1 = start the shot motion now (another is not under way) */
+int heat_charge(int fire, int fire_new, int busy, int idle)
+{
+    int was = hc_hold;
+
+    if (idle)
+        hc_cur_big = 0;
+    if (fire_new) {
+        /* (a press during the charged throw: the charge only - its small shot queued after the motion came out late,
+         * user report 2026-11-12; during a plain throw it is the next one, for mashing) */
+        hc_want = hb_count() < HB_MAX && !hc_cur_big;
+        if (hc_want && axl_part_full())   /* the Ultimate Buster: every throw the charged one (user request 2026-11-12) */
+            hc_want = 2;
+        hc_hold = 0;
+        if (!hc_want && test_on)
+            test_log("heat shot refused (%s)", hc_cur_big ? "the charged throw on: the charge only" : "3 out");
+    } else if (fire) {
+        if (hc_hold < HC_FULL && !axl_part_full())   /* (the Ultimate Buster: every throw the big one already - no
+                                                       * charge, no glow, user report 2026-11-14) */
+            hc_hold++;
+    } else if (!busy && hc_hold) {
+        if (hc_hold >= HC_FULL && hb_count() < HB_MAX)
+            hc_want = 2;
+        if (test_on)
+            test_log("heat charge let go at %d (%s)", hc_hold, hc_hold >= HC_FULL ? "full" : "short");
+        hc_hold = 0;
+    }
+    if (was < HC_SOUND_AT && hc_hold >= HC_SOUND_AT)
+        axl_sound(SND_CHARGE);
+    else if (was >= HC_SOUND_AT && hc_hold < HC_SOUND_AT)
+        axl_sound_stop(SND_CHARGE);
+    if (!hc_want || !idle || busy)
+        return 0;
+    hc_big = hc_cur_big = hc_want == 2;
+    hc_want = 0;
+    return 1;
+}
+
+/* the glow's stage (axl_x.c: X's charge fields after X's update): 0 none, 1, 2 full */
+int heat_charge_stage(void)
+{
+    int h = hc_hold > moves_dash_charge() ? hc_hold : moves_dash_charge();   /* (the dash's charge: axl_moves.c) */
+    return dna_boss != 3 ? 0 : h >= HC_FULL ? 2 : h >= HC_STAGE1 ? 1 : 0;
+}
+
+void heat_charge_reset(void)
+{
+    if (hc_hold >= HC_SOUND_AT)
+        axl_sound_stop(SND_CHARGE);
+    hc_hold = hc_want = hc_big = hc_cur_big = 0;
+}
 
 void dna_heatnix(char *p, int t, int fire, int fire_new)
 {
     char *w;
+    float x, y;
+    int vx, vy;
 
     if (cooldown)
         cooldown--;
     if (!(fire_new || (fire && !cooldown)) || cooldown)
         return;
-    w = proj_spawn(3, PX(p) + SX(p) * 16, PY(p) - 20, SX(p) * FXP(5), 0, FACE(p), 0, 0, P_PIERCE | P_WALL);
+    x = PX(p) + SX(p) * 16;
+    y = PY(p) - 24;
+    hf_throw_speed(p, x, y, &vx, &vy);
+    axl_voice(SND_HEAT_HA);   /* "Ha!" with every throw (user request 2026-11-12) */
+    if (hc_big) {   /* the charged ball */
+        hc_big = 0;
+        w = proj_spawn(HC_ID, x, y, vx, vy, FACE(p), 0, hc_ball, P_PIERCE | P_KEEP | P_GIGA);
+        if (w) {
+            hb_add(w);
+            proj_of(w)->c = -1;
+            proj_of(w)->a = axl_enemy_hits;
+            axl_sound(SND_HEAT_SHOT);
+            proj_box(w, box_bigfire);
+            proj_pose_look(w, HUD_TEX_INDEX, HUD_PAT + 2, GIGA_BIGFIRE);
+            if (test_on)
+                test_log("heat charge ball at %.0f %.0f vx %x", x, y, vx);
+        }
+        CD(30);
+        return;
+    }
+    /* a press: the small fireball (user request 2026-11-12: the crescent went to the special, axl_moves.c), his
+     * fireball's FX picture (0.6x) on the same throw */
+    w = proj_spawn(3, x, y, vx, vy, FACE(p), 0, hs_ball, P_KEEP | P_PIERCE);   /* (off the screen: gone - out there it
+                                                                     * held one of the 3, user report 2026-11-12) */
     if (w) {
+        hb_add(w);
         axl_sound(SND_HEAT_SHOT);
-        proj_boss_look(w, FX_FIRE);
-        proj_box(w, box_hshot);
+        proj_boss_look(w, FX_FIREBALL);
+        proj_box(w, box_hsmall);
     }
     CD(30);
 }
@@ -1054,6 +1341,7 @@ static int dna_giga_busy(void)
 
 void dna_giga_reset(void)
 {
+    heat_charge_reset();   /* (Heatnix's charge, above: the change starts / ends too) */
     giga_k = 0;
     giga_t = 0;
     giga_pose = -1;
@@ -1149,8 +1437,7 @@ static void yg_charge(char *p)
         if (!q || q->fn != yg_option)
             continue;
         if (n) {
-            tx = PX(list[i % n]);
-            ty = PY(list[i % n]) - 8;
+            objs_aim_point(list[i % n], &tx, &ty);
         } else {                                  /* a fan ahead */
             tx = PX(p) + SX(p) * 150;
             ty = PY(p) - 24 + (i - (YG_N - 1) / 2.0f) * 30;
@@ -1221,7 +1508,7 @@ static void giga_yammark(char *p, int t)
 /* the giga keeps him invincible (axl_x.c axl_box): Yammark's spiral */
 int dna_giga_invincible(void)
 {
-    return giga_k == 1 && dna_boss == 1 && giga_t <= YG_SPIRAL;
+    return (giga_k == 1 && dna_boss == 1 && giga_t <= YG_SPIRAL) || (giga_k == 3 && dna_boss == 3);
 }
 
 /* test: the enemies' losses since the giga began (giga_dmg: the spiral's and the charge's) */
@@ -1241,12 +1528,15 @@ static void giga_wolfang(char *p, int t)
 {
     char *list[8], *w;
     int n, i = t / WG_GAP;
-    float tx;
+    float tx, ty;   /* (ty: the aim point's, unused - the chunk's arc is fixed) */
 
     giga_pose = 16 + t % WG_GAP;                  /* (the motion from picture 4; the throw at its frame 30) */
     if (t % WG_GAP == 14 && i < WG_N) {
         n = objs_targets(PX(p), PY(p), 240, 140, list, 8);
-        tx = n ? PX(list[i % n]) : gun_x(p) + SX(p) * (64 + 40 * i);
+        if (n)
+            objs_aim_point(list[i % n], &tx, &ty);
+        else
+            tx = gun_x(p) + SX(p) * (64 + 40 * i);
         w = proj_spawn(GID_WOLF, gun_x(p), gun_y(p) - 8, (int)((tx - gun_x(p)) * 65536) / 46, 0x85d11, FACE(p), 200,
                        w_chunk, P_KEEP | P_NOSCREEN | P_GIGA);
         if (w) {
@@ -1259,75 +1549,282 @@ static void giga_wolfang(char *p, int t)
         giga_k = 0;
 }
 
-/* 3 Heatnix: 5 fireballs thrown one after another (BIN 35 sub 4: the thrown fireball, 32 x 32, bursting into 3
- * shards at 5 px/f in the upper half where it lands; extra throws 0-2 there, 5 here), one every 16 frames at the
- * shot's frame of his attack motion (18), each onto one of the enemies around in turn (none: 40 + 28 i px ahead) in
- * HG_T frames - a higher arc than the boss's (he throws from high up; gravity 0x2000, his 0x1000) */
-#define HG_N 5
-#define HG_GAP 16
-#define HG_T 40
-#define HG_LEN (HG_N * HG_GAP + 8)
-static const signed char box_fireball[4] = {-16, -16, 32, 32};
-static const signed char box_fshard[4] = {-6, -6, 12, 12};
+/* 3 Heatnix: Magma Stream (user requests 2026-11-12: "the boss's purple flames, from the top and the bottom at once,
+ * swallowing the whole screen; normal enemies touched die, bosses take big damage"). The boss's flame is his room's
+ * background layer 1 (BIN 35: 4 frames, every 10 frames, the floor's band rising 144 px, the ceiling's 112); here its
+ * pictures (lc2_dna.magma_pictures: the rematch room's, 2 strips of 160 x 192 per frame, GIGA_FLAMEF floor / GIGA_FLAMEC
+ * ceiling in his HUD section) drawn as 4 screen-space objects (2 strips per band, W+0x28 = -1 as the skill HUD's,
+ * placed after the unit pass: dna_magma_late) with the room's palette (HEAT_FLAME_PAL, its STP colours added to the
+ * screen: translucent flag) in a free CLUT slot while they are up. The bands come in MS_SPEED px/f until each covers
+ * MS_REACH px (the whole 240), stay MS_HOLD frames, go back. Every enemy on the screen inside a band: a normal one is
+ * set to 1 hit point and hit (dead), a boss (or anything over MS_BOSS_HP) is hit every MS_BOSS_GAP frames with X's
+ * charged Magma Blade id (GID_HEAT: his weakness table's). He holds his throw pose, invincible */
+#define O8(p, o) (*(volatile unsigned char *)((p) + (o)))
+#define O16(p, o) (*(volatile unsigned short *)((p) + (o)))
+#define O32(p, o) (*(volatile int *)((p) + (o)))
+typedef void(__fastcall *ms_clut_upload_t)(void *ecx, void *edx, int slot, const void *src, int n);
+#define CLUT_UPLOAD ((ms_clut_upload_t)0x023AAEF0)   /* (axl_dna.c) */
+#define CLUT_OWNER (*(void **)0x041D8C44)
+#define CLUT_SLOT_MEM(s) ((unsigned short *)((char *)CLUT_OWNER + 0x1002C) + 16 * (s))
+#define MS_SPEED 4
+#define MS_REACH 132
+#define MS_IN (MS_REACH / MS_SPEED)
+#define MS_HOLD 50
+#define MS_LEN (2 * MS_IN + MS_HOLD)
+#define MS_BAND_H 192          /* a strip's height (its origin at its middle) */
+#define MS_STRIP_W 160
+#define MS_EDGE 6              /* px of the band's ragged tips that do not hit */
+#define MS_BOSS_HP 32
+#define MS_BOSS_GAP 12
+#define MS_BOSS_DMG 1
+#define MS_KILL_ID 0x16        /* (axl_x.c GIGA_ID: most enemy tables take it - with the flame's own id, for tables
+                                * immune to one of them) */
+#define MS_CAM(i) (*(char **)0x041D8CD0 + 0xA0A8 + 0xB4 * (i))   /* the game's cameras (FUN_023b1210; x +0x14, y +0x1C:
+                                * the view's top left - FUN_023bc5d0, the off-screen test) */
+#define MS_MAX_TG 32
+static const signed char box_magma[4] = {-24, -24, 48, 48};
+static char *ms_cell[4];       /* top left, top right, bottom left, bottom right */
+static int ms_reach, ms_pal = -1;
+static unsigned short ms_pal_orig[16];
+int magma_kills, magma_boss_hits, magma_shown;   /* test */
 
-static void hg_fireball(char *w, proj *q)
+static int ms_screen(char *o, float *sx, float *sy)   /* o's place on the screen, 0 if unknown */
 {
-    int used = 0, n = 0, k;
-    float a;
-    char *s;
+    signed char c = (signed char)O8(o, 0x28);
+    char *cam;
+    if (c < 0 || c > 2 || !*(char **)0x041D8CD0)
+        return 0;
+    cam = MS_CAM(c);
+    *sx = PX(o) - *(volatile float *)(cam + 0x14);
+    *sy = PY(o) - *(volatile float *)(cam + 0x1C);
+    return 1;
+}
 
-    if (dead_dna(w, 3))
-        return;
-    if (!(TERR(w) & 0xB) && q->t < 150) {         /* (a floor or a wall: the burst; the ceiling is passed) */
-        VY(w) -= 0x2000;
-        return;
-    }
-    while (n < 3) {                               /* 3 shards, at k * 15 degrees, k 1-11 all different */
-        k = 1 + rnd() % 11;
-        if (used >> k & 1)
+static int ms_is_boss(char *o)
+{
+    unsigned char t = O8(o, 9);
+    return t == 0x30 || t == 0x37 || (t && strchr("\x31\x32\x33\x34\x36\x38\x39\x3A\x3D\x3E\x3F", t)) ||
+           O8(o, 0x84) > MS_BOSS_HP;
+}
+
+static void ms_hit(char *o, int id)
+{
+    char *w = proj_spawn(id, PX(o), PY(o), 0, 0, 1, 3, 0, P_PIERCE | P_WALL | P_NOSCREEN | P_HIDDEN | P_GIGA);
+    if (w)
+        proj_box(w, box_magma);
+}
+
+static void ms_burn(char *p, int t)
+{
+    char *tg[MS_MAX_TG];
+    int n = objs_targets(PX(p), PY(p), 4096, 4096, tg, MS_MAX_TG), i;
+    float sx, sy;
+
+    for (i = 0; i < n; i++) {
+        if (!ms_screen(tg[i], &sx, &sy) || sx < -16 || sx > 336)
             continue;
-        used |= 1 << k;
-        n++;
-        a = k * 15 * 0.0174533f;
-        s = proj_spawn(GID_HEAT, PX(w), PY(w) - 8, (int)(cosf(a) * 5 * 65536), (int)(sinf(a) * 5 * 65536), k < 6, 40, 0,
-                       P_PIERCE | P_GIGA);
-        if (s) {
-            proj_boss_look(s, FX_FIREBALL);
-            proj_box(s, box_fshard);
+        if (sy > ms_reach - MS_EDGE && sy < 240 - ms_reach + MS_EDGE)
+            continue;                             /* (between the bands) */
+        if (ms_is_boss(tg[i])) {
+            if (t % MS_BOSS_GAP == 0) {
+                ms_hit(tg[i], GID_HEAT);
+                /* big damage, not a kill (user decision 2026-11-12): the body (W+10 0, hit points under 127 - the
+                 * parts' 127: not to be hurt) loses MS_BOSS_DMG more each time, down to 1 at most (the game's own
+                 * hit then ends it, the copy shot's chance as ever) */
+                if (!O8(tg[i], 10) && O8(tg[i], 0x84) > 1 && O8(tg[i], 0x84) < 127)
+                    O8(tg[i], 0x84) = (unsigned char)(O8(tg[i], 0x84) > MS_BOSS_DMG ? O8(tg[i], 0x84) - MS_BOSS_DMG : 1);
+                magma_boss_hits++;
+                if (test_on)
+                    test_log("giga 3 magma: boss %02x part %d hit (hp %d)", O8(tg[i], 9), O8(tg[i], 10), O8(tg[i], 0x84));
+            }
+        } else if (t % 4 == 0) {
+            if (O8(tg[i], 0x84) > 1)
+                O8(tg[i], 0x84) = 1;
+            ms_hit(tg[i], GID_HEAT);
+            ms_hit(tg[i], MS_KILL_ID);
+            magma_kills++;
+            if (test_on)
+                test_log("giga 3 magma: enemy %02x at screen %.0f %.0f burnt", O8(tg[i], 9), sx, sy);
         }
     }
-    proj_kill(w);
 }
+
+static void ms_shake(int on);
 
 static void giga_heatnix(char *p, int t)
 {
-    char *list[8], *w;
-    int n, i = t / HG_GAP, vx, vy;
-    float x, y, tx, ty;
+    int i;
 
-    giga_pose = 10 + t % HG_GAP;                  /* (the motion from picture 5; the shot's frame 18 at the throw) */
-    if (t % HG_GAP == 8 && i < HG_N) {
-        x = PX(p) + SX(p) * 16;
-        y = PY(p) - 24;
-        n = objs_targets(PX(p), PY(p), 150, 100, list, 8);   /* (on the screen: the bursts seen) */
-        tx = n ? PX(list[i % n]) : x + SX(p) * (40 + 28 * i);
-        ty = n ? PY(list[i % n]) - 8 : PY(p) - 8;
-        vx = clampi((int)((tx - x) * 65536) / HG_T, FXP(-6), FXP(6));
-        /* up speed so that it is at ty after HG_T frames: (y - ty) / T + g T / 2 (at most 4: a target high up made
-         * it leave the screen, 2026-11-03 e2e) */
-        vy = clampi((int)(((y - ty) / HG_T + 0.125f * HG_T / 2) * 65536), FXP(1.5), FXP(4));
-        w = proj_spawn(GID_HEAT, x, y, vx, vy, FACE(p), 0,
-                       hg_fireball, P_KEEP | P_NOSCREEN | P_GIGA);
-        if (w) {
-            axl_sound(SND_HEAT_SHOT);
-            proj_boss_look(w, FX_FIREBALL);
-            proj_box(w, box_fireball);
+    /* the boss's own Magma Stream motion (anim 7, pictures 32-38: the fire gathered in his hands, the last held;
+     * dna_looks giga, user request 2026-11-12) */
+    giga_pose = t;
+    if (t == 0) {
+        axl_voice(SND_HEAT_MAGMA);                /* "Magma Stream!" (user request 2026-11-12) */
+        magma_kills = magma_boss_hits = 0;
+        for (i = 0; i < 4; i++) {
+            if (ms_cell[i] && proj_of(ms_cell[i]))
+                proj_kill(ms_cell[i]);
+            ms_cell[i] = proj_spawn(0, 0, -1000, 0, 0, 0, 0, 0,
+                                    P_NOSCREEN | P_WALL | P_TOUGH | P_PIERCE | P_HUD | P_GIGA);
+            if (ms_cell[i]) {
+                proj_pose_look(ms_cell[i], HUD_TEX_INDEX, GIGA_SEC(3), (i < 2 ? GIGA_FLAMEC : GIGA_FLAMEF) + (i & 1));
+                O8(ms_cell[i], 0x0B) = 0;
+            }
         }
-        if (test_on)
-            test_log("giga 3 throw %d at %.0f", i, tx);
     }
-    if (t + 1 >= HG_LEN)
+    ms_reach = t < MS_IN ? (t + 1) * MS_SPEED : t < MS_IN + MS_HOLD ? MS_REACH : (MS_LEN - t) * MS_SPEED;
+    ms_shake(t + 1 < MS_LEN);
+    if (ms_reach > MS_EDGE)
+        ms_burn(p, t);
+    if (t + 1 >= MS_LEN) {
+        ms_reach = 0;
         giga_k = 0;
+    }
+}
+
+/* after the unit pass (axl_menu.c move_hook): the flame strips placed on the screen, shown while the giga runs */
+/* the screen shakes while the flames are up (user request 2026-11-13): the player's camera (MS_CAM) moved by a few px
+ * after the unit pass, every other 2 frames up / down; the offset given is taken back by its change (the camera may
+ * keep it: only the difference is added) */
+#define MS_SHAKE 6
+static float ms_shake_y;
+int magma_shake_log;   /* test */
+
+static void ms_shake(int on)
+{
+    char *cam;
+    signed char c = axl_p ? (signed char)O8(axl_p, 0x28) : -1;
+    float want = on ? ((axl_frames & 2) ? MS_SHAKE : -MS_SHAKE) : 0;
+
+    if (c < 0 || c > 2 || !*(char **)0x041D8CD0 || (!on && ms_shake_y == 0))
+        return;
+    cam = MS_CAM(c);
+    if (test_on && magma_shake_log < 40) {
+        magma_shake_log++;
+        test_log("magma shake: cam y %.1f (applied %.0f) -> want %.0f", *(volatile float *)(cam + 0x1C), ms_shake_y, want);
+    }
+    *(volatile float *)(cam + 0x1C) += want - ms_shake_y;
+    ms_shake_y = want;
+}
+
+void dna_magma_late(void)
+{
+    int i, on = giga_k == 3 && dna_boss == 3 && ms_reach > 0, f = (giga_t / 10) & 3;
+
+
+    if (on && ms_pal < 0 && CLUT_OWNER) {
+        int s = clut_free_run(1, dna_pal_slot, dna_pal_slot + 4);
+        if (s >= 0) {
+            ms_pal = s;
+            memcpy(ms_pal_orig, CLUT_SLOT_MEM(s), sizeof ms_pal_orig);
+            if (test_on)
+                test_log("magma palette at slot %d", s);
+        }
+    }
+    if (on && ms_pal >= 0)
+        CLUT_UPLOAD(CLUT_OWNER, 0, ms_pal, HEAT_FLAME_PAL, 1);
+    if (ms_pal < 0)
+        on = 0;
+    magma_shown = 0;
+    for (i = 0; i < 4; i++) {
+        char *w = ms_cell[i];
+        proj *q = w ? proj_of(w) : 0;
+        if (!q || !q->live) {
+            ms_cell[i] = 0;
+            continue;
+        }
+        if (!on) {
+            proj_kill(w);
+            ms_cell[i] = 0;
+            continue;
+        }
+        O8(w, 0x28) = 0xFF;                       /* screen coordinates */
+        *(volatile float *)(w + 0x14) = (float)(MS_STRIP_W / 2 + MS_STRIP_W * (i & 1));
+        *(volatile float *)(w + 0x1C) = i < 2 ? (float)(ms_reach - MS_BAND_H / 2) : (float)(240 - ms_reach + MS_BAND_H / 2);
+        O32(w, 0x3C) = O32(w, 0x40) = 0;
+        *(void *volatile *)(w + 0x78) = 0;        /* no attack box, no terrain box */
+        *(void *volatile *)(w + 0xA8) = 0;
+        O32(w, 0x54) = HUD_TEX_INDEX;
+        O32(w, 0x58) = GIGA_SEC(3);
+        O8(w, 0x66) = (unsigned char)((i < 2 ? GIGA_FLAMEC : GIGA_FLAMEF) + 2 * f + (i & 1));
+        O16(w, 0x5E) = (unsigned short)ms_pal;
+        O8(w, 0x29) = 0;
+        O8(w, 0x2A) = 3;                          /* behind the units (as the boss's flame layer, a background) */
+        O8(w, 8) |= 0x10;                         /* translucent: added to the screen (STP colours) */
+        O8(w, 0x0B) = 1;
+        magma_shown |= 1 << i;
+    }
+    if (!on && ms_pal >= 0) {
+        if (CLUT_OWNER)
+            CLUT_UPLOAD(CLUT_OWNER, 0, ms_pal, ms_pal_orig, 1);
+        ms_pal = -1;
+    }
+}
+
+/* Heatnix's fire immunity (user request 2026-11-12; axl_hook.c fire_install): changed into Heatnix, the boss Heatnix
+ * Magma Stream does not hurt him (his other attacks do); the death tiles (spikes) kill him as ever */
+#define HEAT_TYPE 0x34
+#define MAGMA_BOX_MIN 96
+#define FIRE_STAGE 3
+static int death_code;          /* the last death tile code met by Axl (0x3E / 0x3F) */
+int fire_blocked, lava_blocked;  /* test */
+int fire_log_all = 0;   /* test: every hurt call logged (the lava probe, 2026-11-13) */
+
+int dna_fire_immune(char *att)
+{
+    unsigned char t = att ? O8(att, 9) : 0, *box = att ? *(unsigned char **)(att + 0x78) : 0;
+    /* only his Magma Stream (user decision 2026-11-12: "the boss's Magma Stream only, his other attacks hurt"): its
+     * hidden boxes, 112 px wide per band (BIN 35) - an object of his fight (0x12) with an attack box MAGMA_BOX_MIN or
+     * more across (his fireballs, crescents: 32 - 60; his body and God Bird dash are his own type 0x34) */
+    char *g = *(char **)0x041D8C8C;   /* (the game state: stage at + 0x70 + 0x48) */
+    int im = dna_boss == 3 && t == 0x12 && box && (box[6] >= MAGMA_BOX_MIN || box[7] >= MAGMA_BOX_MIN) &&
+             objs_find_id(HEAT_TYPE);
+    /* his stage's red floor flames (the Nightmare Snake climb, user request 2026-11-13; play log 2026-11-14:
+     * type 0x24, a 16 px column rising to 88, 8 damage; its sub (00 01 04 10 11 14 18) is only which trap it is:
+     * the whole kind, user report 2026-11-14 "only the first fire trap") - only on his stage (3), only changed to him */
+    /* and the fire rising from the screen's bottom in the climb (play log 2026-11-14: type 0x1d, a 160 x 112 / 128
+     * box, kills at once); its small 12 px kind (sub 04, 2 damage) is not that fire and still hurts */
+    /* the gate stage's (16) rising fire too (user request 2026-11-14; play log: type 0x1d sub 0a, a 240 x 240 box,
+     * kills at once) */
+    if (dna_boss == 3 && g && (unsigned char)g[0x70 + 0x48] == 3 &&
+        (t == 0x24 || (t == 0x1d && box && box[6] >= MAGMA_BOX_MIN)))
+        im = 1;
+    if (dna_boss == 3 && g && (unsigned char)g[0x70 + 0x48] == 16 && t == 0x1d && box && box[6] >= MAGMA_BOX_MIN)
+        im = 1;
+    if (test_on) {
+        static unsigned last;
+        if (axl_frames - last > 20 || im || fire_log_all)
+            test_log("hurt by type %02x sub %02x box %dx%d (boss %d)%s", t, att ? O8(att, 10) : 0, box ? box[6] : 0,
+                     box ? box[7] : 0, dna_boss, im ? ": magma, none" : "");
+        last = axl_frames;
+    }
+    fire_blocked += im;
+    return im;
+}
+
+void dna_death_tile(void *o, int code)
+{
+    if ((char *)o == axl_p && (code == 0x3E || code == 0x3F)) {
+        if (test_on && code != death_code)
+            test_log("death tile %02x", code);
+        death_code = code;
+    }
+}
+
+int dna_lava_immune(void)
+{
+    char *g = *(char **)0x041D8C8C;   /* (the game state: axl_x.c game_st, stage at + 0x70 + 0x48) */
+    /* (no death tile is spared: spikes must kill, and the Heatnix stage's map has no death tiles - its fire is objects,
+     * user report 2026-11-13: the earlier "his stage's death tiles" rule only spared spikes. Logged for the probes) */
+    int stage = g ? (unsigned char)g[0x70 + 0x48] : -1, im = 0;
+    if (test_on) {
+        static unsigned last;
+        if (axl_frames - last > 20)
+            test_log("death tile kill: code %02x stage %d boss %d%s", death_code, stage, dna_boss, im ? ": lava, none" : "");
+        last = axl_frames;
+    }
+    lava_blocked += im;
+    return im;
 }
 
 /* 4 Shark: the junk swim (BIN 36 sub 7: the fin only, 5 px/f at the target, passing it and back) for KG_LEN frames,
@@ -1402,7 +1899,7 @@ static const signed char box_turret[4] = {-14, -5, 28, 10};
 static void tg_shot(char *w, proj *q)
 {
     char *e;
-    float ty, dx, dy, d;
+    float ty, dx, dy, d, ex = 0, ey = 0;
 
     if (dead_dna(w, 6))
         return;
@@ -1410,8 +1907,10 @@ static void tg_shot(char *w, proj *q)
         VX(w) = VY(w) = 0;
     } else if (q->t == 40) {                      /* the rush: at the nearest target (none: level, the way it faced) */
         e = find_target(PX(w), PY(w), 320);
-        dx = e ? PX(e) - PX(w) : (q->right ? 1 : -1);
-        dy = e ? PY(e) - 12 - PY(w) : 0;
+        if (e)
+            objs_aim_point(e, &ex, &ey);
+        dx = e ? ex - PX(w) : (q->right ? 1 : -1);
+        dy = e ? ey - PY(w) : 0;
         d = sqrtf(dx * dx + dy * dy);
         if (d < 1)
             d = 1;
@@ -1420,7 +1919,7 @@ static void tg_shot(char *w, proj *q)
         *(volatile unsigned char *)(w + 0x29) = (*(volatile unsigned char *)(w + 0x29) & ~0x40) | (dx > 0 ? 0x40 : 0);
         proj_box(w, box_turret);
     } else if (q->t > 40 && (e = find_target(PX(w), PY(w), 320)) != 0) {   /* toward its height: 1/32 px/f more a frame */
-        ty = PY(e) - 12;
+        objs_aim_point(e, &ex, &ty);
         VY(w) += ty < PY(w) - 1 ? 0x800 : ty > PY(w) + 1 ? -0x800 : 0;
         VY(w) = clampi(VY(w), FXP(-4), FXP(4));
     }
@@ -1795,6 +2294,18 @@ int dna_value(const char *name, int *ok)
     }
     if (!strcmp(name, "yam_blasts"))
         return yam_blasts;
+    if (!strcmp(name, "heat_blasts"))
+        return heat_blasts;
+    if (!strcmp(name, "fire_blocked"))
+        return fire_blocked;
+    if (!strcmp(name, "lava_blocked"))
+        return lava_blocked;
+    if (!strcmp(name, "magma_kills"))
+        return magma_kills;
+    if (!strcmp(name, "magma_boss_hits"))
+        return magma_boss_hits;
+    if (!strcmp(name, "magma_shown"))
+        return magma_shown;
     if (!strcmp(name, "yam_capped"))
         return yam_capped;
     if (!strcmp(name, "yam_form"))

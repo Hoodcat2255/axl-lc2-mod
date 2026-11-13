@@ -1,0 +1,24 @@
+# Heatnix with the Ultimate Buster worn (user request 2026-11-12: its charges at once): st + 0xB0 bit 0x80000 (byte B2
+# = 08); a shot press throws the charged ball at once (log 'heat charge ball'), a dash press is the God Bird at once
+# (log 'move 3 start', no 'heat dash 1 0').
+all_weapons
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+set B2 8
+goto 200 1060 4
+idle 40
+pset 14C 3
+press 4 S
+idle 100
+press 2 RIGHT
+idle 10
+log ub_shot
+press 3 X
+idle 60
+log ub_dash
+press 3 A
+idle 60
+end

@@ -15,8 +15,8 @@
 
 #define AXL_DATA_FILE "axl_data.bin"
 #define AXL_DATA_MAGIC 0x444C5841u   /* "AXLD" */
-#define AXL_DATA_VERSION 7           /* + 1 at every layout change */
-#define AXL_DATA_SIZE 44044          /* sizeof(axl_data_t): the packer and the DLL agree on the layout */
+#define AXL_DATA_VERSION 10          /* + 1 at every layout change */
+#define AXL_DATA_SIZE 45848          /* sizeof(axl_data_t): the packer and the DLL agree on the layout */
 
 /* ---- the mod's own constants (the generated headers repeat them: a mismatch stops the packer) ---- */
 #define DNA_SEQ_MAX 96
@@ -43,7 +43,7 @@ typedef struct { unsigned vt; unsigned char dur, flag; signed char step; unsigne
 typedef struct { unsigned char n, at; unsigned char dur[DNA_SEQ_MAX], pose[DNA_SEQ_MAX]; } dna_seq;
 typedef struct { int tex, pat, pal; dna_seq idle, fire, atk, move, alt, walk, jump, fall, land; dna_seq cling, ceil, cjump,
                  cshot, cdash, leap; dna_seq idle2, jump2, fall2; unsigned char lift[64]; signed char push[64];
-                 dna_seq toss; } dna_look_t;
+                 dna_seq toss, giga; } dna_look_t;
 
 /* array limits (the generated tables must fit: the packer checks) */
 #define AXL_TABLE_MAX 256   /* anims are a byte */
@@ -86,7 +86,9 @@ typedef struct {
     unsigned short dna_pals[N_BOSSES][64];
     /* axl_hud_looks.h (lc2_dna.py hud_header) */
     int hud_tex_index, hud_pat, giga_ball, giga_ball_n, giga_gather, giga_gather_n, giga_orb, giga_orb_n, giga_jet, giga_jet_r, giga_jet_n, giga_form, giga_form_n, giga_opt_rot,
-        giga_opt_rot_n, giga_jet_rot, giga_jet_rot_n;
+        giga_opt_rot_n, giga_jet_rot, giga_jet_rot_n, giga_bigfire, giga_bigfire_n, giga_spark, giga_spark_n,
+        giga_slash, giga_slash_r, giga_slash_n, giga_flamef, giga_flamef_n, giga_flamec, giga_flamec_n;
+    unsigned short heat_flame_pal[16];
     unsigned short hud_pals[N_BOSSES][2 * HUD_LEVELS][16];
     /* axl_dna_looks.h: the turned muzzle flash (lc2_dna.flash_looks) */
     int flash_tex_index, flash_pat;
@@ -180,6 +182,18 @@ int axl_data_load(void);   /* 1 = axl_data.bin read and checked */
 #define GIGA_OPT_ROT_N (axl_d.giga_opt_rot_n)
 #define GIGA_JET_ROT (axl_d.giga_jet_rot)
 #define GIGA_JET_ROT_N (axl_d.giga_jet_rot_n)
+#define GIGA_BIGFIRE (axl_d.giga_bigfire)
+#define GIGA_BIGFIRE_N (axl_d.giga_bigfire_n)
+#define GIGA_SPARK (axl_d.giga_spark)
+#define GIGA_SPARK_N (axl_d.giga_spark_n)
+#define GIGA_SLASH (axl_d.giga_slash)
+#define GIGA_SLASH_R (axl_d.giga_slash_r)
+#define GIGA_SLASH_N (axl_d.giga_slash_n)
+#define GIGA_FLAMEF (axl_d.giga_flamef)
+#define GIGA_FLAMEF_N (axl_d.giga_flamef_n)
+#define GIGA_FLAMEC (axl_d.giga_flamec)
+#define GIGA_FLAMEC_N (axl_d.giga_flamec_n)
+#define HEAT_FLAME_PAL (axl_d.heat_flame_pal)
 #define hud_pals (axl_d.hud_pals)
 #define FLASH_TEX_INDEX (axl_d.flash_tex_index)
 #define FLASH_PAT (axl_d.flash_pat)

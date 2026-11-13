@@ -26,6 +26,7 @@ struct proj {
     float tx, ty;         /* behaviour state: a spot (Yammark's giga charge) */
     int vx, vy;
     unsigned char id, right, anim, live, nobox, hitno, fx;
+    signed char got;      /* this frame's hit (W+0xD4 before it is cleared: > 0 a hit, < 0 blocked), for the behaviour */
     int tex, pat;         /* (proj_pose_look: another texture / parts section than the FX one) */
 };
 

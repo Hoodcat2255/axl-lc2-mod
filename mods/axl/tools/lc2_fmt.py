@@ -32,8 +32,53 @@ BACKUP = os.path.join(BUILT, 'backup')                     # pristine copies (lc
 GEN = os.path.join(BUILT, 'gen')   # headers made from the game data (lc2_build / lc2_hook), packed into axl_data.bin
 # normal X's archives: file -> (PS1 data it carries, PAT entry name)
 STSEL = 'stsel_eng.arc'   # stage select: PLAYER SELECT shows "AXL" for the normal X (lc2_build.build_stsel)
+STSEL_JP = 'stsel.arc'   # the Japanese one: "アクセル" (lc2_build.build_stsel_jp)
 KAO = 'kao.arc'   # dialogue portraits: k_plNN_000 (TEX, PS1 DAT entry 163 + 2N) + col k_plNN (COL, entry 164 + 2N)
 KAO_TEX = 'X6\\chr\\kao\\k_pl%02d_000'
+# in-stage dialogue (user request 2026-11-14: "스테이지 안에서만 액셀로", English and Japanese): each stage archive's
+# X-player texts X6\kaiwa\st_NNx / st_NNxx (+ _eng; z / xz are Zero's: X stays X there), 16-bit words (low 10 bits a
+# glyph of the dialogue font, high bits attributes: 0x08.. = the speaker's name, 0x40 = the name's end). X's name:
+# English "X" + its end word -> "AXL" (the font's 7-per-row grid: A 0x00, X 0x32, L 0x14), Japanese "エックス" ->
+# "アクセル" (moji20, 10 per row: ア 106, ク 113, セ 119, ル 146; the last word keeps the end attribute)
+H_KAIWA = 0x4b575fd0
+KAIWA_ARCS = tuple('%s%s.arc' % (st, lang) for st in (
+    'st00', 'st01', 'st01x', 'st02', 'st02x', 'st03', 'st03x', 'st04a', 'st04b', 'st04x', 'st05', 'st05x', 'st06a',
+    'st06x', 'st07', 'st07x', 'st08', 'st08x', 'st0ca', 'st0cb', 'st0g', 'st0h', 'st0i') for lang in ('', '_eng'))
+KAIWA_NAME = {'_eng': ((0x0832, 0x5863), (0x0800, 0x0832, 0x0814, 0x5863)),
+              '': ((0x086D, 0x08B6, 0x0871, 0x5876), (0x086A, 0x0871, 0x0877, 0x5892))}
+
+
+def kaiwa_x(arc):
+    """the X-player dialogue entries of a stage archive: [(name, language suffix)]"""
+    import re
+    out = []
+    for e in arc.entries:
+        m = re.match(r'X6\\kaiwa\\st_\w\wxx?(_eng)?$', e['name'])
+        if e['hash'] == H_KAIWA and m:
+            out.append((e['name'], m.group(1) or ''))
+    return out
+
+
+def kaiwa_count(data, words):
+    w = struct.unpack_from('<%dH' % ((len(data) - 16) // 2), data, 16)
+    n = len(words)
+    return sum(1 for i in range(len(w) - n + 1) if w[i:i + n] == words)
+
+
+def kaiwa_axl(data, lang):
+    """X's speaker name -> Axl's in one dialogue file"""
+    old, new = KAIWA_NAME[lang]
+    w = list(struct.unpack_from('<%dH' % ((len(data) - 16) // 2), data, 16))
+    out, i, n = [], 0, 0
+    while i < len(w):
+        if tuple(w[i:i + len(old)]) == old:
+            out += new
+            i += len(old)
+            n += 1
+        else:
+            out.append(w[i])
+            i += 1
+    return data[:16] + struct.pack('<%dH' % len(out), *out) + data[16 + 2 * len(w):], n
 KAO_COL = 'X6\\col\\kao\\k_pl%02d'
 PL02 = {'pl02_eng.arc': ('us', 'X6\\pat\\pl\\pl02_eng\\pl02_eng'), 'pl02.arc': ('jp', 'X6\\pat\\pl\\pl02\\pl02')}
 COL_NAME = 'X6\\col\\pl\\pl02\\pl02'

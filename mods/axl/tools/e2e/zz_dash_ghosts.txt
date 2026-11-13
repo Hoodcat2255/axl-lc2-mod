@@ -1,0 +1,31 @@
+# Dash afterimages on video (user report 2026-11-12: "Heatnix's dash silhouettes look unlike Yammark's"): Yammark's
+# X-style dash left and right, then Heatnix's plain dash (a tap) left and right. Run with lc2_test.py --video.
+all_weapons
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1040 4
+idle 40
+pset 14C 1
+press 4 S
+idle 100
+press 20 A LEFT
+idle 30
+press 20 A RIGHT
+idle 40
+press 2 C
+idle 80
+pset 14C 3
+press 4 S
+idle 100
+press 2 LEFT
+idle 5
+press 3 A
+idle 40
+press 2 RIGHT
+idle 5
+press 3 A
+idle 60
+end

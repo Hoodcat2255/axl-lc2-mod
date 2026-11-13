@@ -127,6 +127,18 @@ int main(int argc, char **argv)
     d.giga_opt_rot_n = GIGA_OPT_ROT_N;
     d.giga_jet_rot = GIGA_JET_ROT;
     d.giga_jet_rot_n = GIGA_JET_ROT_N;
+    d.giga_bigfire = GIGA_BIGFIRE;
+    d.giga_bigfire_n = GIGA_BIGFIRE_N;
+    d.giga_spark = GIGA_SPARK;
+    d.giga_spark_n = GIGA_SPARK_N;
+    d.giga_slash = GIGA_SLASH;
+    d.giga_slash_r = GIGA_SLASH_R;
+    d.giga_slash_n = GIGA_SLASH_N;
+    d.giga_flamef = GIGA_FLAMEF;
+    d.giga_flamef_n = GIGA_FLAMEF_N;
+    d.giga_flamec = GIGA_FLAMEC;
+    d.giga_flamec_n = GIGA_FLAMEC_N;
+    SAME(heat_flame_pal, heat_flame_pal);
     SAME(hud_pals, hud_pals);
     d.flash_tex_index = FLASH_TEX_INDEX;
     d.flash_pat = FLASH_PAT;

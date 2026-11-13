@@ -239,6 +239,112 @@ static int expect(DWORD at, const unsigned char *bytes, DWORD len)
     return memcmp((void *)at, bytes, len) == 0;
 }
 
+/* Heatnix's fire immunity (user request 2026-11-12: changed into Heatnix, no harm from fire - the boss Heatnix's
+ * Magma Stream, the lava of his and the gate's stages, his stage's fire traps). The player's hurt FUN_023ce940
+ * (thiscall, the attacking object as its one stack arg, 1 = hurt) asks dna_fire_immune first; the death tiles'
+ * kill (X main's call of FUN_023ca4f0 at 0x0253AB30, when the death flag P+0xB9 is set) asks dna_lava_immune; the
+ * two tile tests that set that flag (FUN_023cd540 / FUN_023cf800, cdecl (obj, code[, side]): codes 0x3E / 0x3F)
+ * report the code (dna_death_tile) */
+#define HURT_PLAYER     0x023CE940u   /* push ecx; push ebx; push esi; push edi; mov esi, ecx (6 bytes moved) */
+#define DEATH_TILE_CALL 0x0253AB30u   /* call FUN_023ca4f0 */
+#define DEATH_TILE_FN   0x023CA4F0u
+#define TILE_TEST_A     0x023CD540u   /* movzx eax, byte [esp+8]; add eax, -0x38 (8 bytes moved) */
+#define TILE_TEST_B     0x023CF800u   /* cmp dword [esp+0xc], 0; movzx eax, byte [esp+8] (10 bytes moved) */
+typedef int(__fastcall *hurt_t)(void *, void *, char *);
+typedef int(__cdecl *tile_t)(void *, int, int);
+static hurt_t hurt_orig;
+static tile_t tile_a_orig, tile_b_orig;
+
+static int __fastcall hurt_hook(void *ecx, void *edx, char *att)
+{
+    if (dna_fire_immune(att))
+        return 0;
+    return hurt_orig(ecx, edx, att);
+}
+
+/* the damage itself (FUN_023ce200, thiscall, stack (attacker, victim), ret 8): FUN_023ce940 calls it, and 7 attackers
+ * call it directly - his stage's red floor flames hurt through it (play log 2026-11-14: blocked at FUN_023ce940, still
+ * 8 damage) */
+#define HURT_APPLY 0x023CE200u   /* sub esp, 8; push ebp; mov ebp, [esp+0x14] (8 bytes moved) */
+typedef int(__fastcall *apply_t)(void *, void *, char *, char *);
+static apply_t apply_orig;
+
+static int __fastcall apply_hook(void *ecx, void *edx, char *att, char *vic)
+{
+    int r;
+    unsigned char *box;
+    if (vic == axl_p && dna_fire_immune(att))
+        return 0;
+    r = apply_orig(ecx, edx, att, vic);
+    if (r && test_on && att && vic == axl_p) {   /* (what really hurt him: the immunity probe, 2026-11-14) */
+        box = *(unsigned char **)(att + 0x78);
+        test_log("hurt BY type %02x sub %02x box %dx%d at %.0f %.0f", *(unsigned char *)(att + 9),
+                 *(unsigned char *)(att + 10), box ? box[6] : 0, box ? box[7] : 0, *(float *)(att + 0x14),
+                 *(float *)(att + 0x1C));
+    }
+    return r;
+}
+
+static void __fastcall death_tile_hook(void *ecx)
+{
+    if (dna_lava_immune())
+        return;
+    ((void(__fastcall *)(void *))DEATH_TILE_FN)(ecx);
+}
+
+static int __cdecl tile_a_hook(void *o, int code, int side)
+{
+    dna_death_tile(o, code & 0xFF);
+    return tile_a_orig(o, code, side);
+}
+
+static int __cdecl tile_b_hook(void *o, int code, int side)
+{
+    dna_death_tile(o, code & 0xFF);
+    return tile_b_orig(o, code, side);
+}
+
+/* an entry hook: the first n bytes (position independent) moved to a trampoline that jumps back after them */
+static void *entry_hook(DWORD at, int n, void *to)
+{
+    unsigned char *t = code_alloc(32), b[16];
+    int i;
+    if (!t)
+        return 0;
+    memcpy(t, (void *)at, n);
+    t[n] = 0xE9;
+    put_rel(t + n + 1, (DWORD)t + n + 5, (void *)(at + n));
+    code_seal(t, 32);
+    b[0] = 0xE9;
+    put_rel(b + 1, at + 5, to);
+    for (i = 5; i < n; i++)
+        b[i] = 0x90;
+    patch(at, b, n);
+    return t;
+}
+
+static void fire_install(void)
+{
+    static const unsigned char hurt_entry[6] = {0x51, 0x53, 0x56, 0x57, 0x8B, 0xF1};
+    static const unsigned char apply_entry[8] = {0x83, 0xEC, 0x08, 0x55, 0x8B, 0x6C, 0x24, 0x14};
+    static const unsigned char tile_a[8] = {0x0F, 0xB6, 0x44, 0x24, 0x08, 0x83, 0xC0, 0xC8};
+    static const unsigned char tile_b[10] = {0x83, 0x7C, 0x24, 0x0C, 0x00, 0x0F, 0xB6, 0x44, 0x24, 0x08};
+    unsigned char b[5] = {0xE8};
+    if (!expect(HURT_PLAYER, hurt_entry, 6) || !expect(HURT_APPLY, apply_entry, 8) || !expect(TILE_TEST_A, tile_a, 8) || !expect(TILE_TEST_B, tile_b, 10) ||
+        *(unsigned char *)DEATH_TILE_CALL != 0xE8 ||
+        DEATH_TILE_CALL + 5 + *(LONG *)(DEATH_TILE_CALL + 1) != DEATH_TILE_FN) {
+        test_log("fire immunity: sites not as expected, not installed");
+        return;
+    }
+    hurt_orig = (hurt_t)entry_hook(HURT_PLAYER, 6, (void *)hurt_hook);
+    apply_orig = (apply_t)entry_hook(HURT_APPLY, 8, (void *)apply_hook);
+    tile_a_orig = (tile_t)entry_hook(TILE_TEST_A, 8, (void *)tile_a_hook);
+    tile_b_orig = (tile_t)entry_hook(TILE_TEST_B, 10, (void *)tile_b_hook);
+    put_rel(b + 1, DEATH_TILE_CALL + 5, (void *)death_tile_hook);
+    patch(DEATH_TILE_CALL, b, 5);
+}
+
+
 /* every sound request (FUN_023be620, thiscall on the sound manager, 3 stack args: kind, id, obj): the ones of our
  * projectiles' muzzle flashes are dropped (they cut Axl's change voice: user report 2026-10-26); logged when testing */
 typedef void(__fastcall *se_play_t)(void *mgr, void *edx, int kind, int id, char *obj);
@@ -291,6 +397,11 @@ static void __fastcall se_hook(void *mgr, void *edx, int kind, int id, char *obj
             warn_tick();
         }
     }
+    /* pl00 requests 9 / 12 (X's, never heard from Axl in the logs: his charge shot's, a guess) carry Heatnix's "Ha!" /
+     * "Teya!" now (user request 2026-11-12, lc2_build HEAT_VOICES): the game's own (the Overdrive's charged buster,
+     * maybe) play Axl's shot instead */
+    if (kind == 1 && (id == 9 || id == 12) && !axl_se_own)
+        id = 8;
     if (test_on)
         test_log("se kind %d id %d obj %p%s%s", kind, id, obj, obj && obj == axl_p ? " (player)" : "",
                  drop ? " dropped" : "");
@@ -350,8 +461,10 @@ static void install(void)
     if (!expect(X_MAIN_SLOT54, slot54, 7) || !expect(X_MAIN_POST, post, 5) ||
         !expect(NEW_GAME_ARMOR, new_armor, 5) || !expect(MAKE_OBJECT, make_entry, 6) ||
         !expect(X_MAIN_BOX, box, 5)) {
+#ifndef AXL_RELEASE
         OutputDebugStringA("axl_lc2: RXC2.exe build mismatch, hooks not installed\n");
         test_log("build mismatch, hooks not installed");
+#endif
         return;
     }
     b[0] = 0x6A;
@@ -383,6 +496,7 @@ static void install(void)
     put_rel(b + 1, X_MAIN_BOX + 5, (void *)x_box_hook);
     patch(X_MAIN_BOX, b, 5);
     se_log_install();
+    fire_install();
     if (!menu_install())
         test_log("menu: unit move pass not as expected");
     if (!proj_install())
@@ -499,8 +613,10 @@ static void install(void)
         }
     }
 #endif
+#ifndef AXL_RELEASE   /* (the release build: no messages at all, user request 2026-11-14 "로그 남기는 부분은 전부 제거") */
     OutputDebugStringA("axl_lc2: hooks installed\n");
     test_log("hooks installed");
+#endif
 }
 
 /* ---- DirectInput wrapping (test harness: scripted keys; not in the release build) ---- */

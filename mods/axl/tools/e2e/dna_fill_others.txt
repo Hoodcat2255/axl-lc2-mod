@@ -1,0 +1,24 @@
+# The other boss gauges refill during a change (user request 2026-11-13; axl_dna.c dna_before): changed into Yammark
+# (weapon 1), Wolfang's gauge (weapon 2, P+0x1A4, 16 bits: p_ shows one byte, so 1A4 low / 1A5 high) emptied: after
+# 300 frames changed it has risen (a full 576 in FILL_FRAMES 1200: about 144), while Yammark's own (P+0x1A2) has
+# fallen from full (576 = 0x240: high byte 2) by the drain. No 'energy full' (it refills every gauge itself).
+all_weapons
+seq
+wait free == 1 9000
+god on
+ghost on
+pset 1A2 40
+pset 1A3 2
+pset 14C 1
+press 4 S
+idle 100
+pset 1A4 0
+pset 1A5 0
+show p_1A2 p_1A3 p_1A4 p_1A5
+idle 300
+show p_1A2 p_1A3 p_1A4 p_1A5 changed
+expect changed >= 1 still_changed
+expect p_1A4 >= 100 others_refill
+expect p_1A5 == 0 others_refill_hi
+expect p_1A3 < 2 own_drains
+end

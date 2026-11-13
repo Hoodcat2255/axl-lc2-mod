@@ -42,6 +42,9 @@ void dna_yammark(char *p, int t, int fire, int fire_new);   /* axl_dna_bosses.c 
 int dna_hit_loss(char *e, int loss);   /* axl_dna_bosses.c: an enemy's loss to Yammark's wedge charge, made less */
 void dna_wolfang(char *p, int t, int fire, int fire_new);
 void dna_heatnix(char *p, int t, int fire, int fire_new);
+int heat_charge(int fire, int fire_new, int busy, int idle);   /* axl_dna_bosses.c: Heatnix's charged shot */
+int heat_charge_stage(void);
+void heat_charge_reset(void);
 void dna_shark(char *p, int t, int fire, int fire_new);
 void dna_scaravich(char *p, int t, int fire, int fire_new);
 void dna_turtloid(char *p, int t, int fire, int fire_new);
@@ -108,6 +111,7 @@ void yam_next_form(void);              /* axl_dna_bosses.c: Yammark's next forma
 extern int yam_form;                   /* 0 circle, 1 wedge, 2 line abreast, 3 column */
 extern int axl_fly_fast;               /* axl_x.c: Yammark's dash on (the HUD) */
 int moves_yam_dash_dir(int *dy);         /* axl_moves.c: its direction (dx; *dy) */
+int moves_dash_charge(void);           /* axl_moves.c: frames Heatnix's dash button has been held (its charge) */
 int moves_yam_dash(void);              /* axl_moves.c: Yammark's dash under way */
 int moves_yam_ghosts(void);
 /* axl_hud.c: the skill HUD (docs/skills_design.md) */
@@ -115,6 +119,10 @@ void hud_frame(char *p);               /* X main: the buttons made while changed
 void __fastcall axl_boss_hp_set(char *comp, void *edx, int v);   /* axl_x.c: the boss hold (axl_hook.c) */
 int dna_stage_boss_type(int stage);     /* axl_dna.c: stage 1-8's Maverick type, else 0 */
 void items_late(void);                /* axl_items.c: after the unit pass, the 1UP's palette slot */
+int dna_fire_immune(char *att);      /* axl_dna_bosses.c: Heatnix not hurt by this (fire) */
+int dna_lava_immune(void);           /* axl_dna_bosses.c: Heatnix not killed by this death tile (lava) */
+void dna_death_tile(void *o, int code);   /* axl_dna_bosses.c: a death tile code met (0x3E / 0x3F) */
+void dna_magma_late(void);           /* axl_dna_bosses.c: the Magma Stream flames, after the unit pass */
 void hud_late(int menu_open);          /* after the unit pass: placed, shown / hidden */
 
 /* axl_menu.c: the DNA menu (L / R) */
@@ -139,6 +147,9 @@ void dna_flash_tick(void);
 void *dna_hurt_box(void);                   /* the changed boss's hurt box object, 0 = X's */
 /* sounds of Axl's bank (FUN_023be620 kind 1; request ids, lc2_build.BOSS_SOUNDS / CHANGE_SOUND) */
 void axl_sound(int id);
+extern int axl_se_own;   /* axl_dna.c: axl_voice / axl_sound's request under way (se_hook) */
+void dna_charge_palette(int on, int k);   /* axl_dna.c: the charge glow's colours, boss k (0 Axl) */
+int axl_part_full(void);              /* axl_x.c: the Ultimate Buster worn */
 void axl_voice(int id);   /* axl_dna.c: a request on no object */
 void axl_sound_stop(int id);           /* axl_dna.c: stops a pl00 request's sound */
 extern int dna_pal_slot, menu_pal_lo;   /* our CLUT slots now (axl_dna.c clut_free_run) */
@@ -148,6 +159,8 @@ int moves_look(void);
 #define FLAME_ANIM 246                  /* lc2_hook.FLAME_ANIM: anim FLAME_ANIM + i holds hover flame i */
 void dna_screen_flash(void);            /* axl_dna.c */
 int dna_flashing(void);
+void objs_aim_point(char *e, float *x, float *y);   /* axl_objs.c: where to aim at e (learned, else its hurt box) */
+int objs_aim_at(char *e, float *x, float *y);   /* axl_objs.c: where e was last hurt (lately), 1; else 0 */
 int objs_targets(float x, float y, int rx, int ry, char **out, int max);   /* axl_objs.c */                   /* axl_moves.c: 1 dash move, 2 second attack, 0 none */
 #define MENU_SLOTS 45                   /* 9 badges x MENU_PALS (5), checked in axl_menu.c */
 /* damage id of the guard-break bullet: 0x18 = Zero's first saber hit (PS1 ids 0x18-0x1F, 0x23-0x2A are Zero's).
@@ -170,6 +183,11 @@ int objs_targets(float x, float y, int rx, int ry, char **out, int max);   /* ax
 #define SND_YAM_LINE 17
 #define SND_YAM_FINAL 24
 #define SND_YAM_SPIRAL 16 /* the giga's "Formation... Spiral!" (without the user's file: "Final!") */
+#define SND_HEAT_GODBIRD 14   /* pl00 requests 14 / 15 / 9 / 12: Heatnix's "God Bird!" / "Magma Stream!" / "Ha!" /
+                              * "Teya!" (lc2_build HEAT_VOICES; 9 / 12 X's own, the game's turned into the shot by se_hook) */
+#define SND_HEAT_MAGMA 15
+#define SND_HEAT_HA 9
+#define SND_HEAT_TEYA 12
 #define SND_WOLF_THROW 21
 #define SND_WOLF_BREAK 22
 #define SND_HEAT_SHOT 23

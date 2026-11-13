@@ -5,8 +5,8 @@
  * pictures (tools/lc2_dna.py: texture / parts section / palettes added to pl02*.arc) while his own animation,
  * frame, hurt box and moves go on underneath, as on PS1. The weapon's energy is the change gauge: it drains while
  * changed (DRAIN_FRAMES for a full gauge; White Axl: no drain) and the change ends when it is empty, on the special
- * button again, on a weapon change or when a cutscene takes control; while not changed every boss gauge refills
- * (empty to full in FILL_FRAMES).
+ * button again, on a weapon change or when a cutscene takes control; every other boss gauge refills meanwhile, and
+ * all of them while not changed (empty to full in FILL_FRAMES).
  *
  * The look is applied after X's hurt box (axl_box) and taken back at the start of the next frame (axl_frame), so only
  * the draw sees it (PS1 swapped the fields around its draw call): texture index P+0x54, parts section P+0x58,
@@ -15,6 +15,7 @@
  * moved by its push (float x P+0x14).
  */
 #include <windows.h>
+#include <math.h>
 #include <string.h>
 
 #include "axl_lc2.h"
@@ -490,11 +491,15 @@ void axl_sound_stop(int id)
 
 /* a voice on no object (as READY, axl_hook.c): on the player it went unheard (user report 2026-11-10, Yammark's
  * "Formation!" - the requests reached the game) */
+int axl_se_own;   /* a request of ours under way (axl_voice / axl_sound) */
+
 void axl_voice(int id)
 {
     if (!SE_MGR)
         return;
+    axl_se_own = 1;   /* (axl_hook.c se_hook: ours, not the game's - the voice slots 9 / 12 kept from it) */
     SE_PLAY(SE_MGR, 0, 1, id, 0);
+    axl_se_own = 0;
     if (test_on)
         test_log("voice %d", id);
 }
@@ -503,44 +508,20 @@ void axl_sound(int id)
 {
     if (!SE_MGR || !axl_p)
         return;
+    axl_se_own = 1;
     SE_PLAY(SE_MGR, 0, 1, id, axl_p);
+    axl_se_own = 0;
     if (test_on)
         test_log("sound %d", id);
 }
 
 /* Boss-size collision (user decision 2026-10-26): changed, Axl's hurt box is the boss's (dna_box: since 2026-11-02 the
  * boss's own hurt box from the original fight, before that his idle picture's extent)
- * and the change needs the boss's room free above him (dna_room: his picture less a little overlap, 2026-11-02):
- * the player's terrain box (P+0xA8, 38 px tall) is tested at 8 px steps up to that height; terrain there refuses
- * the change. */
+ * (the change asked the boss's room free above him, 2026-11-02; removed, user decision 2026-11-14: "변신 할 때 높이조건
+ * ... 없애줘" - he changes under any ceiling). */
 typedef struct { const void *vt; signed char b[4]; } box_t;
 #define BOX_VT ((const void *)0x031DA67C)
 static box_t boss_boxes[9];
-static box_t probe_box = {BOX_VT, {0, 2, 4, 19}};   /* the player's terrain box (0, 2, 11, 19) narrowed: walls beside
-                                                      * him are not a ceiling */
-
-static int head_room(char *p, int k, int mask)
-{
-    int r, top = dna_room[k] - 38 + 8;
-    float y = *(volatile float *)(p + 0x1C);
-    void *own = *(void **)(p + 0xA8);
-
-    *(void **)(p + 0xA8) = &probe_box;
-    for (r = 8; r <= top; r += 8) {
-        *(volatile float *)(p + 0x1C) = y - r;
-        if (proj_terrain(p) & mask) {
-            *(volatile float *)(p + 0x1C) = y;
-            *(void **)(p + 0xA8) = own;
-            if (test_on)
-                test_log("dna head room: boss %d blocked %d px up (needs %d)", k, r, dna_room[k]);
-            return 0;
-        }
-    }
-    *(volatile float *)(p + 0x1C) = y;
-    *(void **)(p + 0xA8) = own;
-    return 1;
-}
-
 /* axl_box: the changed boss's hurt box (0 = keep X's) */
 void *dna_hurt_box(void)
 {
@@ -620,6 +601,12 @@ int dna_before(char *p, int special_new, int busy)
 {
     int k = WEAPON(p), i;
 
+    /* every boss gauge refills (empty to full in FILL_FRAMES), the changed boss's one only while not changed (user
+     * request 2026-11-13: the others fill up during a change too) */
+    for (fill_acc += ENERGY_MAX(p); fill_acc >= FILL_FRAMES; fill_acc -= FILL_FRAMES)
+        for (i = 1; i <= 8; i++)
+            if (owned(p, i) && i != dna_boss && ENERGY(p, i) < ENERGY_MAX(p))
+                ENERGY(p, i)++;
     if (leave_t) {   /* the leaving blink holds Axl (as the pose), the change over at its end */
         if (LOCK(p)) {
             dna_end(p);
@@ -642,14 +629,10 @@ int dna_before(char *p, int special_new, int busy)
         return 1;
     }
     if (!dna_boss) {
-        for (fill_acc += ENERGY_MAX(p); fill_acc >= FILL_FRAMES; fill_acc -= FILL_FRAMES)
-            for (i = 1; i <= 8; i++)
-                if (owned(p, i) && ENERGY(p, i) < ENERGY_MAX(p))
-                    ENERGY(p, i)++;
         if (test_on && special_new)
             test_log("dna press k %d owned %d energy %d state %d busy %d", k, owned(p, k), k <= 8 ? ENERGY(p, k) : -1,
                      STATE(p), busy);
-        if (!busy && special_new && owned(p, k) && ENERGY(p, k) >= ENERGY_MAX(p) / DNA_MIN_DIV && head_room(p, k, 0xF) &&
+        if (!busy && special_new && owned(p, k) && ENERGY(p, k) >= ENERGY_MAX(p) / DNA_MIN_DIV &&
             (STATE(p) == 2 || STATE(p) == 3 || STATE(p) == 4 || STATE(p) == 6 || STATE(p) == 7 || STATE(p) == 8 ||
              STATE(p) == 12)) {   /* (12 = the ground dash, 2026-11-02: refused before, Axl dashed on under the beep -
                                    * "the boss slid forward"; the pose's held x stops him) */
@@ -770,7 +753,10 @@ void dna_after(char *p, int fire, int fire_new, int alt_new)
         alt_prev = dna_alt;
         atk_n = q->n != 0;
     }
-    if (mode == 1 && !atk_n && fire)
+    if (dna_boss == 3) {                          /* Heatnix: a press shoots, a hold charges (axl_dna_bosses.c) */
+        if (heat_charge(fire, fire_new, moves_look() != 0 || dna_giga_look() >= 0, !atk_n) && mode == 1)
+            atk_n = 1;
+    } else if (mode == 1 && !atk_n && fire)
         atk_n = 1;                                /* held: the next attack as soon as the motion ends */
     atk_cur = -1;
     if (atk_n) {
@@ -827,8 +813,8 @@ static const dna_seq *motion_seq(char *p, const dna_look_t *L, int *code)
     s32 vy = *(volatile s32 *)(p + 0x40), vx = *(volatile s32 *)(p + 0x3C);
     const dna_seq *q;
 
-    if (dna_boss == 1 && moves_yam_dash()) {   /* the dash (speeds 0, it moves him itself): the flight's look
-                                                   * that way - forward, up, down (user report 2026-11-10) */
+    if ((dna_boss == 1 || dna_boss == 3) && moves_yam_dash()) {   /* the dash (speeds 0, it moves him itself): the
+        * flight's look that way - forward, up, down (user report 2026-11-10; Heatnix's plain dash too, 2026-11-12) */
         int dy, dx = moves_yam_dash_dir(&dy);
         m = dx ? 4 : dy < 0 ? 5 : 6;
     } else if (dna_flies() && axl_floor_walk)   /* (walking on the floor, down held: X crouched, axl_x.c flight) */
@@ -879,6 +865,10 @@ int dna_ghost_palette(int on)
      * flag (axl_moves.c yd_ghost_fn, byte 8 | 0x10 - the PS1's o[0] 0x10, its quads' ABE: additive). (Without the flag,
      * STP colours were not seen: their dark greens, added, 2026-11-09 / 11.) (7, 22, 6), (4, 14, 4), (2, 7, 2) */
     static const unsigned short green[3] = {0x9AC7, 0x91C4, 0x88E2};
+    /* Heatnix's (user request 2026-11-12: his plain dash showed Yammark's green): fire orange, (24, 10, 2), (14, 6, 1),
+     * (7, 3, 0) */
+    static const unsigned short orange[3] = {0x8958, 0x84CE, 0x8067};
+    const unsigned short *col = dna_boss == 3 ? orange : green;
     unsigned short pal[GHOST_SLOTS * 16];
     int s, i;
 
@@ -901,9 +891,84 @@ int dna_ghost_palette(int on)
     }
     for (s = 0; s < GHOST_SLOTS; s++)
         for (i = 0; i < 16; i++)
-            pal[16 * s + i] = i ? green[s / 4] : 0;
+            pal[16 * s + i] = i ? col[s / 4] : 0;
     CLUT_UPLOAD(CLUT_OWNER, 0, gpal_slot, pal, GHOST_SLOTS);
     return gpal_slot;
+}
+
+/* The charge glow's colours per boss (user request 2026-11-12: "the charge effect's palette per boss, Axl's too"):
+ * X's charge sparks are drawn in CLUT slot CHG_SLOT's colours CHG_FROM..CHG_TO (the blues 10-13 = X's COL CLUT 78,
+ * f609 the sparks' own colour on the screen; the PS1 copy shot was X's charge shot with this slot's blue made green,
+ * docs/feasibility.md; 2026-11-12 probe zz_charge_probe: slots 11 / 0x2C, the sparks' W+0x5E, did nothing). While Axl
+ * or a changed boss charges, those colours are turned to the hue chg_hue[k] (saturation and brightness kept: the
+ * whites stay white; chg_sv scales them), put back when the charge ends; colours 1-5 (the slot's yellows) are left. 0 = Axl. */
+#define CHG_SLOT 2
+#define CHG_FROM 6
+#define CHG_TO 14
+static const short chg_hue[9] = {
+    228,   /* Axl: light navy (user request 2026-11-12; with chg_sv) */
+    120,   /* Yammark: green */
+    195,   /* Wolfang: ice blue */
+    28,    /* Heatnix: fire orange */
+    270,   /* Shark: purple */
+    48,    /* Scaravich: sand yellow */
+    165,   /* Turtloid: sea green */
+    52,    /* Sheldon: gold */
+    305,   /* Mijinion: magenta */
+};
+/* saturation and brightness in percent of X's (Axl's navy: paler and a little darker than X's blue) */
+static const unsigned char chg_sv[9][2] = {{60, 85}, {100, 100}, {100, 100}, {100, 100}, {100, 100}, {100, 100},
+                                           {100, 100}, {100, 100}, {100, 100}};
+static unsigned short chg_orig[16];
+static int chg_on, chg_k = -1;
+
+static unsigned short chg_recolour(unsigned short c, int hue, int sat_pct, int val_pct)
+{
+    float r = (c & 31) / 31.0f, g = (c >> 5 & 31) / 31.0f, b = (c >> 10 & 31) / 31.0f;
+    float mx = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+    float v = mx * val_pct / 100, sat = (mx > 0 ? (mx - mn) / mx : 0) * sat_pct / 100, h = hue / 60.0f, f, pp, q, t;
+    int i = (int)h % 6;
+
+    if (!(c & 0x7FFF))
+        return c;                                 /* (0: transparent / black kept) */
+    f = h - (int)h;
+    pp = v * (1 - sat);
+    q = v * (1 - sat * f);
+    t = v * (1 - sat * (1 - f));
+    r = i == 0 || i == 5 ? v : i == 1 ? q : i == 4 ? t : pp;
+    g = i == 1 || i == 2 ? v : i == 0 ? t : i == 3 ? q : pp;
+    b = i == 3 || i == 4 ? v : i == 2 ? t : i == 5 ? q : pp;
+    return (unsigned short)((c & 0x8000) | (int)(r * 31 + 0.5f) | (int)(g * 31 + 0.5f) << 5 | (int)(b * 31 + 0.5f) << 10);
+}
+
+void dna_charge_palette(int on, int k)
+{
+    unsigned short pal[16];
+    int i;
+
+    if (!CLUT_OWNER)
+        return;
+    if (!on) {
+        if (chg_on)
+            CLUT_UPLOAD(CLUT_OWNER, 0, CHG_SLOT, chg_orig, 1);
+        chg_on = 0;
+        chg_k = -1;
+        return;
+    }
+    if (!chg_on) {
+        memcpy(chg_orig, CLUT_SLOT_MEM(CHG_SLOT), sizeof chg_orig);
+        chg_on = 1;
+    }
+    if (k == chg_k)
+        return;
+    chg_k = k;
+    for (i = 0; i < 16; i++)
+        pal[i] = i >= CHG_FROM && i <= CHG_TO ?
+                 chg_recolour(chg_orig[i], chg_hue[k < 9 ? k : 0], chg_sv[k < 9 ? k : 0][0], chg_sv[k < 9 ? k : 0][1]) :
+                 chg_orig[i];
+    CLUT_UPLOAD(CLUT_OWNER, 0, CHG_SLOT, pal, 1);
+    if (test_on)
+        test_log("charge palette: boss %d hue %d (slot %d)", k, chg_hue[k < 9 ? k : 0], CHG_SLOT);
 }
 
 int dna_test_nolook;   /* test (axl_test.c 'nolift look'): no look at all */
@@ -928,9 +993,9 @@ void dna_look(char *p, int fire)
     }
     mv_prev = mv;
     /* a giga attack holding him: his attack motion at that frame (none: his shot's pose - Turtloid) */
-    if ((t = dna_giga_look()) >= 0 && (L->atk.n || L->fire.n)) {
+    if ((t = dna_giga_look()) >= 0 && (L->giga.n || L->atk.n || L->fire.n)) {
         mv_seq = 0;
-        q = L->atk.n ? &L->atk : &L->fire;
+        q = L->giga.n ? &L->giga : L->atk.n ? &L->atk : &L->fire;   /* (his own giga motion first: Heatnix's anim 7) */
         for (i = 0; i < q->n - 1 && t >= q->dur[i]; i++)
             t -= q->dur[i];
         look_s = 2;
@@ -1036,10 +1101,15 @@ static void put_look(char *p, int pose, int tick)
     }
     O8(p, 0x66) = (u8)pose;
     look_pose = pose;
+    /* (drawn at whole pixels, user report 2026-11-12: flying, a fractional x showed the background through a seam
+     * between two 16 px parts of Heatnix's picture - the screen is drawn scaled up; the bosses' own positions are
+     * whole pixels) */
     if (!dna_test_nolift)   /* (test 'nolift': the lift's move left out, to see what it does to the terrain) */
-        *(volatile float *)(p + 0x1C) = saved.y - L->lift[pose];
+        *(volatile float *)(p + 0x1C) = floorf(saved.y - L->lift[pose] + 0.5f);
+    else
+        *(volatile float *)(p + 0x1C) = floorf(saved.y + 0.5f);
     /* the push in the boss's own facing: its pictures face left, mirrored when Axl faces right */
-    *(volatile float *)(p + 0x14) = saved.x + ((O8(p, 0x29) & 0x40) ? -L->push[pose] : L->push[pose]);
+    *(volatile float *)(p + 0x14) = floorf(saved.x + ((O8(p, 0x29) & 0x40) ? -L->push[pose] : L->push[pose]) + 0.5f);
 }
 
 /* The weapon HUD's 3-digit number (user request 2026-10-28: the change's time left): X's HUD (FUN_023d82d0) shows a

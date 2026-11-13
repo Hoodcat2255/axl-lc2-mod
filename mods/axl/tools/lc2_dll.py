@@ -6,7 +6,7 @@ usage: lc2_dll.py [--release] [--no-skills] [--out PATH]
 The game-derived tables are not compiled in: the DLL reads them at start-up from axl_data.bin next to it
 (lc2/axl_data.h; lc2_data.py makes the file from the user's game data). Python standard library and zig (the ziglang
 package) only, so a CI machine without the game builds the same DLL (.github/workflows/build-dll.yml).
---release: AXL_RELEASE (no test harness, no options file); --no-skills: AXL_NO_SKILLS (no cooldowns, no skill HUD, no
+--release: AXL_RELEASE (no test harness, no options file, no log: the test-only functions dropped by --gc-sections); --no-skills: AXL_NO_SKILLS (no cooldowns, no skill HUD, no
 boss giga attacks - the test5 release, user decision 2026-11-04). The version resource (lc2/axl_version.rc) takes
 its numbers from mods/axl/VERSION.
 """
@@ -40,7 +40,7 @@ def build_dll(release=False, no_skills=False, out=None):
     srcs = sorted(os.path.join(LC2, f) for f in os.listdir(LC2) if f.endswith('.c'))
     cmd = ZIG + ['cc', '-target', 'x86-windows-gnu', '-shared', '-O2', '-s',
                  '-Wall', '-Wno-unused-function', '-Wno-unused-const-variable', '-Wno-unused-variable'] + \
-        (['-DAXL_RELEASE'] if release else []) + (['-DAXL_NO_SKILLS'] if no_skills else []) + ['-o', out] + srcs + \
+        (['-DAXL_RELEASE', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections'] if release else []) + (['-DAXL_NO_SKILLS'] if no_skills else []) + ['-o', out] + srcs + \
         [res, os.path.join(LC2, 'dinput8.def'), '-lkernel32', '-luser32']
     try:
         subprocess.run(cmd, check=True)

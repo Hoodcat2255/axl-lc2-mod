@@ -600,6 +600,7 @@ static void spawn_shot(char *self, char *p, int id, float x, float y, s32 vx, s3
     spawn_fixed.on = 0;
 }
 
+static int copy_hold;                  /* frames the special button has been held (the copy shot's charge, below) */
 static char *fx_seen[16];
 static int fx_age[16];
 static int flash_due = -1;   /* the aim of Axl's bullet just made: its set-up makes its flash next (-1 none) */
@@ -689,6 +690,9 @@ void axl_spawned(char *w, int kind, int id, int sub, char *owner)
     track[i].guard = id == 0 &&
                      (++shot_count % (armor() == 4 ? GUARD_EVERY_WHITE : part_rapid ? GUARD_EVERY_RAPID : GUARD_EVERY) == 0 ||
                       axl_guard_test);
+    if (test_on)
+        test_log("bullet %d guard %d rapid %d pierce %d armour %d", shot_count, track[i].guard, part_rapid, axl_pierce,
+                 armor());
     track[i].tip = tip;
     track[i].fixed = spawn_fixed.on;
     if (spawn_fixed.on) {   /* before its first update: shots that do not take X's hand position start here */
@@ -914,16 +918,6 @@ static int own_bullet(char *p, char *w)
            !proj_of(w);
 }
 
-/* the centre of an object's hurt box (box object {vtable, dx, dy, w, h}; facing right mirrors dx) */
-static void box_centre(char *e, float *x, float *y)
-{
-    const signed char *b = *(const signed char *const *)(e + 0x7C);
-    float bx = (float)b[4] + (unsigned char)b[6] * 0.5f;
-
-    *x = W_X(e) + ((FACING(e) & FACE_RIGHT) ? -bx : bx);
-    *y = W_Y(e) + (float)b[5] + (unsigned char)b[7] * 0.5f;
-}
-
 static void homing(char *p)
 {
     int i;
@@ -945,7 +939,7 @@ static void homing(char *p)
             continue;
         a = atan2f(vy, vx) * 57.29578f;
         if ((e = find_target(W_X(w), W_Y(w), HOME_RANGE)) != 0) {
-            box_centre(e, &ex, &ey);
+            objs_aim_point(e, &ex, &ey);   /* (where it was last hurt, if lately, else its hurt box: axl_objs.c) */
             ta = atan2f(W_Y(w) - ey, ex - W_X(w)) * 57.29578f;
             diff = ta - a;
             while (diff > 180)
@@ -1158,7 +1152,7 @@ static char *fx_spawn(float x, float y, int life, proj_fn fn, int a, int pic)
 #define COPY_STAGE2 90
 #define COPY_POSE 16          /* frames of the shot pose */
 #define COPY_SOUND_AT 25      /* X's charge sound starts 25 frames into the hold */
-static int copy_hold;                  /* frames the special button has been held */
+static int heat_glow;                  /* Heatnix's charge stage written to X's charge fields after X's update */
 
 static int opt_auto, part_full, part_quick;   /* this frame's auto charge / full-charge / quick-charge (charge_hide) */
 static void copy_charge(char *p, int held)   /* 1 held (a frame on), 0 let go, -1 broken off */
@@ -1246,6 +1240,11 @@ static void charge_hide(char *p)
     *OPT_BYTE = (unsigned char)(hidden_opt & ~3);   /* (bit 1, held = rapid fire, too: Axl fires so anyway - user
                                                      * request 2026-10-29, the option on or off no difference) */
     PARTS_EQ(p) = hidden_parts & ~PART_FULL;
+}
+
+int axl_part_full(void)   /* the Ultimate Buster worn this frame (Heatnix's charges at once: axl_dna_bosses.c, axl_moves.c) */
+{
+    return part_full;
 }
 
 static void charge_unhide(void)
@@ -1917,8 +1916,9 @@ static void giga_barrage(char *p, int t)
     if ((t - GIGA_FIRE_AT) % GIGA_FIRE_GAP == 0)
         for (k = 0; k < GIGA_FIRE_N; k++) {
             if (giga_tn && (k & 1) == 0 && giga_live(giga_tg[i = giga_rand(giga_tn)])) {
-                x = *(volatile float *)(giga_tg[i] + 0x14) + (float)(giga_rand(25) - 12);   /* on a target's body */
-                y = *(volatile float *)(giga_tg[i] + 0x1C) + (float)(giga_rand(25) - 12);
+                objs_aim_point(giga_tg[i], &x, &y);   /* on a target's body: where it gets hurt (axl_objs.c) */
+                x += (float)(giga_rand(25) - 12);
+                y += (float)(giga_rand(25) - 12);
             } else {
                 x = ax + (float)(giga_rand(2 * GIGA_SCREEN_X) - GIGA_SCREEN_X);
                 y = ay + (float)(giga_rand(2 * GIGA_SCREEN_Y) - GIGA_SCREEN_Y) - 16;
@@ -1933,6 +1933,34 @@ static void giga_barrage(char *p, int t)
         axl_sound(SND_SHOT);
 }
 
+/* a big armoured target (user request 2026-11-14: the Heatnix stage's red sphere, hurt at its turning core only - the
+ * Giga Crush's one 56 px box at its middle hit it now and then): a hurt box GIGA_BIG px or more across on a damage
+ * table immune to the buster (first entry FF) - the giga covers its whole body with 4 boxes of 120 px (240 x 240
+ * around its hurt box's middle, side by side: the core in one of them, wherever it has turned) */
+#define GIGA_BIG 96
+static const signed char box_giga_q[4][4] = {{-120, -120, 120, 120}, {0, -120, 120, 120}, {-120, 0, 120, 120},
+                                             {0, 0, 120, 120}};
+
+static int giga_armoured(char *e, float *cx, float *cy)
+{
+    const unsigned char *b = *(const unsigned char *const *)(e + 0x7C);
+    unsigned t = *(volatile unsigned *)(e + 0x80);
+
+    if (!b || (b[6] < GIGA_BIG && b[7] < GIGA_BIG) || !t || IsBadReadPtr((void *)t, 1) || *(unsigned char *)t != 0xFF)
+        return 0;
+    *cx = *(volatile float *)(e + 0x14) + ((O8(e, 0x29) & 0x40) ? -1 : 1) * ((signed char)b[4] + b[6] * 0.5f);
+    *cy = *(volatile float *)(e + 0x1C) + (signed char)b[5] + b[7] * 0.5f;
+    return 1;
+}
+
+/* (one of the 4 boxes hurt it: the others go - one hit a giga, user decision 2026-11-14; 4 hits of 32 ended it) */
+static void giga_quad_fn(char *w, proj *q)
+{
+    char *e = (char *)q->a;
+    if (!e || !O8(e, 8) || O8(e, 0x84) < (unsigned)q->b)
+        proj_kill(w);
+}
+
 static void giga_hit(char *p)
 {
     char *tg[GIGA_MAX], *w;
@@ -1941,10 +1969,30 @@ static void giga_hit(char *p)
     dna_screen_flash();
     n = giga_targets(p, tg);
     for (i = 0; i < n; i++) {
-        float x = *(volatile float *)(tg[i] + 0x14), y = *(volatile float *)(tg[i] + 0x1C);
-        w = proj_spawn(GIGA_ID, x, y, 0, 0, 1, 4, 0, P_PIERCE | P_WALL | P_NOSCREEN | P_HIDDEN);
-        if (w)
-            proj_box(w, box_giga);
+        float x, y;
+        objs_aim_point(tg[i], &x, &y);   /* (where it gets hurt: a core only, user report 2026-11-14 - the Heatnix stage's
+                                          * Nightmare Snake took nothing at its middle) */
+        if (test_on)
+            test_log("giga target %02x.%02x hp %d at %.0f %.0f (its place %.0f %.0f)", O8(tg[i], 9), O8(tg[i], 10),
+                     O8(tg[i], 0x84), x, y, *(volatile float *)(tg[i] + 0x14), *(volatile float *)(tg[i] + 0x1C));
+        if (giga_armoured(tg[i], &x, &y)) {
+            int q;
+            for (q = 0; q < 4; q++) {
+                w = proj_spawn(GIGA_ID, x, y, 0, 0, 1, 4, giga_quad_fn, P_PIERCE | P_WALL | P_NOSCREEN | P_HIDDEN);
+                if (w) {
+                    proj_box(w, box_giga_q[q]);
+                    proj_of(w)->a = (int)tg[i];
+                    proj_of(w)->b = O8(tg[i], 0x84);
+                }
+            }
+            if (test_on)
+                test_log("giga target %02x.%02x armoured: its whole body covered around %.0f %.0f", O8(tg[i], 9),
+                         O8(tg[i], 10), x, y);
+        } else {
+            w = proj_spawn(GIGA_ID, x, y, 0, 0, 1, 4, 0, P_PIERCE | P_WALL | P_NOSCREEN | P_HIDDEN);
+            if (w)
+                proj_box(w, box_giga);
+        }
         w = proj_spawn(0, x, y, 0, 0, 1, 3 * GIGA_BURST + 1, giga_burst_fn, P_PIERCE | P_WALL | P_NOSCREEN | P_HIT1);
         if (w)
             proj_nobox(w);
@@ -2298,6 +2346,14 @@ void axl_frame(char *self, x_fn orig)
         charge_hide(p);   /* (X's auto charge / full-charge part off for X's update: the copy shot's, copy_auto) */
     else
         opt_auto = part_full = part_quick = part_rapid = axl_pierce = 0;
+    /* (after the else above: placed between, it took that else - every frame without Heatnix's glow cleared the
+     * parts' flags, Rapid 5 / Speed Shot not taken, user report 2026-11-12) */
+    if (on && heat_glow) {   /* (Heatnix's charge glow is for the draw only: X's charge fields 0 through
+                                          * X's update, else X fires its charge buster at the release) */
+        CHARGE_STAGE(p) = 0;
+        CHARGE_ID(p) = 0;
+        heat_glow = 0;
+    }
     shot_new = (NEWP(p) & B_SHOT) != 0;
     /* R: the changed boss's second attack (user request 2026-10-28: L and R both opening the ring was a waste; the
      * giga button stays the Giga Attack - Axl's Giga Crush, the bosses' own later), never X's weapon change */
@@ -2311,6 +2367,14 @@ void axl_frame(char *self, x_fn orig)
     NEWP(p) &= ~B_R;
     proj_frame();
     objs_hp_frame();
+    if (test_on) {   /* (the player's hit points down: logged with where he is - the lava probe, 2026-11-13) */
+        static unsigned char hp_was;
+        unsigned char hp = O8(p, 0x84);
+        if (hp < hp_was)
+            test_log("player hp %d -> %d at %.0f %.0f state %d", hp_was, hp, *(volatile float *)(p + 0x14),
+                     *(volatile float *)(p + 0x1C), O8(p, 0x0D));
+        hp_was = hp;
+    }
     log_fx = (shooting || copy_hold) && test_on;
     if (test_on)
         fx_log();
@@ -2509,8 +2573,10 @@ void axl_post(char *self)
     SHOT_COUNT(p) += (u8)shot_lent;
     shot_lent = 0;
 
-    if (!is_normal_x(self) || INIT(p) != 1)
+    if (!is_normal_x(self) || INIT(p) != 1) {
+        dna_charge_palette(0, 0);   /* (X's own colours back for anyone else) */
         return;
+    }
     {   /* changed: no rope (user report 2026-10-29: the flying bosses got caught on ropes) - X's state code took one
          * (states 27 / 28, snapped onto it): put back where he was and falling (flight takes over), drawn so */
         static float rx, ry;
@@ -2558,6 +2624,12 @@ void axl_post(char *self)
             hover_after(p);
     }
     dna_after(p, shooting, shooting && shot_new, alt_new);
+    if (dna_boss && (heat_glow = heat_charge_stage()) != 0) {   /* Heatnix's charge: X's glow for the draw */
+        CHARGE_STAGE(p) = (u8)heat_glow;
+        CHARGE_ID(p) = heat_glow == 2 ? COPY_FULL_ID : 9;
+    }
+    /* the glow's colours: the changed boss's, Axl's (user request 2026-11-12; axl_dna.c) */
+    dna_charge_palette(heat_glow || (copy_hold >= COPY_STAGE1 && WEAPON(p) == 0 && !dna_boss), dna_boss);
     hud_frame(p);   /* (the skill HUD's buttons, axl_hud.c) */
     afterimage_colours(p);
     copy_update(p);

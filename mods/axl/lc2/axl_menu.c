@@ -75,6 +75,7 @@ static float ring_grow;       /* 0 .. 1: the ring spreads out from Axl when it o
 static char *icons[9];   /* badge 0 Axl (his own gun), k boss k */
 static unsigned char keys_prev[256];
 static unsigned short swallow;   /* X's buttons held back after the menu closed, until released */
+static char *menu_p;             /* the player the ring opened on */
 int menu_change_to;           /* a boss chosen: axl_x.c starts the change with it (MENU_AXL: back to Axl) */
 
 static int key_down(int vk)
@@ -234,6 +235,7 @@ int menu_frame(char *self, char *p)
         for (k = 0; k < 256; k++)
             keys_prev[k] = (unsigned char)key_down(k);   /* the L / R press that opened it is old */
         chosen = 0;
+        menu_p = p;
         ring_rot = 0;
         ring_grow = 0.05f;
         opening = OPEN_FRAMES;
@@ -246,14 +248,68 @@ int menu_frame(char *self, char *p)
     return 1;
 }
 
+/* The game's pause menu closes the ring (user request 2026-11-14: "메뉴가 열릴 때 링 메뉴는 닫혔으면 해"): its scene's
+ * states 3 and 4 (table 0x03481908 + 4 * state; state 4 draws the rows, the giga row's je 0x023E9F78) run while it
+ * is up - wrapped, they mark it seen; the next tick closes the ring (no choice made). */
+#define PAUSE_SLOT3 0x03481914u
+#define PAUSE_SLOT4 0x03481918u
+#define PAUSE_ST3 0x023E9DE0u
+#define PAUSE_ST4 0x023E9E70u
+typedef void(__fastcall *pstate_t)(void *scene, void *edx);
+static int pause_seen;
+
+static void __fastcall pause3_hook(void *scene, void *edx)
+{
+    pause_seen = 1;
+    ((pstate_t)PAUSE_ST3)(scene, edx);
+}
+
+static void __fastcall pause4_hook(void *scene, void *edx)
+{
+    pause_seen = 1;
+    ((pstate_t)PAUSE_ST4)(scene, edx);
+}
+
+static int pause_install(void)
+{
+    void *f3 = (void *)pause3_hook, *f4 = (void *)pause4_hook;
+    DWORD old;
+    if (*(DWORD *)PAUSE_SLOT3 != PAUSE_ST3 || *(DWORD *)PAUSE_SLOT4 != PAUSE_ST4 ||
+        !VirtualProtect((void *)PAUSE_SLOT3, 8, PAGE_READWRITE, &old))
+        return 0;
+    memcpy((void *)PAUSE_SLOT3, &f3, 4);
+    memcpy((void *)PAUSE_SLOT4, &f4, 4);
+    VirtualProtect((void *)PAUSE_SLOT3, 8, old, &old);
+    return 1;
+}
+
 /* every frame, before the units move (also while paused) */
 static void menu_tick(void)
 {
     int i, k, step = 0, pad_choose = 0, pad_close = 0;
     char *p = axl_p;
 
+    if (pause_seen && menu_state) {
+        pause_seen = 0;
+        if (test_on)
+            test_log("menu: the game's pause menu opened, closed");
+        close_menu();
+        return;
+    }
+    pause_seen = 0;
     if (!menu_state || !p)
         return;
+    if (!O8(p, 8) || O8(p, 0x0C) != 1 || p != menu_p) {
+        /* the stage left with the ring open (the game's own pause menu still works: user report 2026-11-14 - the ring
+         * kept the move lines paused in the next scenes, no text drawn): closed with the player gone */
+        if (test_on)
+            test_log("menu: the player gone (alive %d init %d), closed", O8(p, 8), O8(p, 0x0C));
+        for (i = 0; i < 9; i++)
+            if (icons[i] && !proj_of(icons[i]))
+                icons[i] = 0;   /* (freed with the stage: not ours to kill) */
+        close_menu();
+        return;
+    }
     ring_grow += (1.0f - ring_grow) * 0.14f;              /* spreads out over ~30 frames */
     if (ring_grow > 0.99f)
         ring_grow = 1.0f;
@@ -351,6 +407,7 @@ static void __fastcall move_hook(void *self)
     }
     items_late();      /* (axl_items.c: the 1UP's own palette slot) */
     axl_look_late();   /* (axl_x.c: this frame's look, every unit moved) */
+    dna_magma_late();  /* (axl_dna_bosses.c: Heatnix's Magma Stream flames placed) */
     hud_late(menu_state != 0);   /* (axl_hud.c: the skill HUD placed and shown, or hidden) */
 }
 
@@ -362,6 +419,8 @@ int menu_install(void)
 
     if (memcmp((void *)UNIT_MOVE, entry, 8))
         return 0;
+    if (!pause_install())
+        test_log("menu: pause menu states not as expected (the ring stays open under it)");
     t = code_alloc(16);
     if (!t)
         return 0;

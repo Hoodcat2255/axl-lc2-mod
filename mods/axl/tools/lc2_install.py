@@ -25,7 +25,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import lc2_fmt as F  # noqa: E402
 
-FILES = tuple(F.PL02) + (F.KAO, F.STSEL, 'cledit_eng_reg_wor.arc')   # (+ the staff roll: lc2_credits)
+FILES = tuple(F.PL02) + (F.KAO, F.STSEL, F.STSEL_JP, 'cledit_eng_reg_wor.arc') + F.KAIWA_ARCS   # (+ the staff roll: lc2_credits;
+# the stage archives: their dialogue's X named Axl)
 DLL = 'dinput8.dll'
 DATA = 'axl_data.bin'   # (lc2/axl_data.h: next to the DLL)
 OPTIONS = 'axl_options.txt'
@@ -86,6 +87,13 @@ def is_shipped(path, fn):
     if fn == 'cledit_eng_reg_wor.arc':   # the staff roll: its last two screens still empty
         import lc2_credits
         return lc2_credits.is_shipped(path)
+    if fn == F.STSEL_JP:   # X's name still its tiles 6-9
+        arc = F.Arc(path)
+        return [struct.unpack('<BBbb', r)[1] for r in F.pat_sections(arc.get('X6\\pat\\stage\\stsel\\stsel', F.H_PAT))[0][5]] == [6, 7, 8, 9]
+    if fn in F.KAIWA_ARCS:   # X still named X in its dialogue
+        arc = F.Arc(path)
+        return all(F.kaiwa_count(arc.get(n, F.H_KAIWA), F.KAIWA_NAME[l][0]) and
+                   not F.kaiwa_count(arc.get(n, F.H_KAIWA), F.KAIWA_NAME[l][1]) for n, l in F.kaiwa_x(arc))
     if fn == F.STSEL:   # the name frame still X's single tile
         arc = F.Arc(path)
         return [struct.unpack('<BBbb', r) for r in F.pat_sections(arc.get('X6\\pat\\stage\\stsel_eng\\stsel_eng', F.H_PAT))[0][5]] == [(0, 6, -8, -8)]

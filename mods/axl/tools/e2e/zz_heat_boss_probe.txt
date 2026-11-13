@@ -1,0 +1,55 @@
+# Probe (2026-11-12): stage 3 checkpoints 5-8 (respawns there), each a snap and the place, then the bot right
+# 900 frames from the last one that loaded, a boss looked for.
+seq
+include to_stage_select
+set 48 3
+set 49 0
+press 4 Z
+talk 6000 free == 1
+god on
+ghost on
+set 59 5
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+show stage area checkpoint px py boss_alive
+log snap_cp5
+snap
+idle 20
+set 59 6
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+show stage area checkpoint px py boss_alive
+log snap_cp6
+snap
+idle 20
+set 59 7
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+show stage area checkpoint px py boss_alive
+log snap_cp7
+snap
+idle 20
+set 59 8
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+show stage area checkpoint px py boss_alive
+log snap_cp8
+snap
+idle 20
+log walk
+bot right
+wait boss_alive == 1 1500
+bot off
+show px py boss_alive boss_hp
+log snap_end
+snap
+objs
+end

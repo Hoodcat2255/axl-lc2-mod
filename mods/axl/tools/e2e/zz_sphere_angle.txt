@@ -1,0 +1,135 @@
+# Probe (2026-11-13): the red sphere mid-boss turning - snaps every 10 frames with its bytes (axl_objs.c sphere_log) to find its mouth angle field
+all_weapons
+seq
+include to_stage_select
+set 48 3
+set 49 0
+press 4 Z
+talk 6000 free == 1
+god on
+energy full
+bot right
+
+idle 450
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+idle 10
+snap
+bot off
+end

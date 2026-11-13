@@ -1,0 +1,39 @@
+# Heatnix: charges back to back (user report 2026-11-12: "pressed again right after a charged throw, a plain shot
+# came out first; pressed again in the God Bird, no charge"): a full shot charge let go, the shot button pressed and
+# held again 10 frames later through the throw (log 'heat charge let go at 60 (full)' twice, 'heat charge ball' twice,
+# no plain fireball between: shots counted, the bursts' shards too); then the God Bird and the dash pressed and held
+# again 5 frames into it (log 'heat dash ... (charge only)', a second 'god bird' after).
+all_weapons
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1060 4
+idle 40
+pset 14C 3
+press 4 S
+idle 100
+press 2 LEFT
+idle 10
+log chain_shot
+hold X
+idle 70
+release
+idle 10
+hold X
+idle 75
+release
+idle 120
+log chain_dash
+press 2 RIGHT
+idle 10
+hold A
+idle 65
+release
+idle 5
+hold A
+idle 65
+release
+idle 60
+end

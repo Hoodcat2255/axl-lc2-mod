@@ -371,6 +371,7 @@ static void proj_update(char *task, char *w, proj *q)
 
     q->task = task;
     q->seen = frame_now;
+    q->got = hit;
     if (hit) {
         if (!(q->flags & (P_PIERCE | P_TOUGH)) || (hit < 0 && !(q->flags & P_TOUGH))) {
             proj_kill(w);

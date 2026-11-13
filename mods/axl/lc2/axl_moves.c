@@ -8,7 +8,7 @@
  *               walls and ceiling (wolf_*): a wall touched in the air holds him (jump: leap off, down: let go, DNA
  *               button: ice up and down the wall); up + jump: up to the ceiling, hanging (shot: 4 aimed shards, dash:
  *               the ceiling dash leaving icicles, down / jump: let go)
- *   Heatnix     firebird rush 8 px/f, invincible, big body    thrown fireball, 3 shards at 5 px/f where it lands
+ *   Heatnix     tap: X-style dash 20 f (yd_*, hd_input);       the 3-step blade \\ / X 5 px/f through walls (the shot's until 2026-11-12)
  *   Shark       junk swim: under the floor, the fin only,     leap 8 px/f above the target, hover, pound 5 px/f
  *               5 px/f left / right while dash is held, invincible (walking: the prone fin, boss_look walk)
  *   Scaravich   charge 5 px/f, body hit                       small balls 3 px/f
@@ -59,7 +59,57 @@ static const signed char box_bird[4] = {-96, -67, 127, 96};    /* the firebird {
 static const signed char box_fin[4] = {-8, 6, 16, 16};         /* the swim's fin out of the floor (16 x 16) */
 static const signed char box_shark[4] = {-16, -49, 32, 56};    /* {-16,-24,32,56}, origin 25 up */
 static const signed char box_shell[4] = {-60, -98, 120, 120};  /* the spinning shell {-60,-60,120,120} (0x800FE834) */
-static const signed char box_fire[4] = {-16, -16, 32, 32};
+/* at most CRESCENT_MAX of it out (user requests 2026-11-12: "one shot only", then "two: one felt cramped", then 3
+ * for the 3-step blade): the special does nothing while that many fly */
+#define CRESCENT_MAX 3
+/* the 3-step blade (user request 2026-11-12: "\\", "/", then X): the special pressed again within SLASH_WINDOW
+ * frames of the last throw is the next step, else the first; the pictures lc2_dna.blade_pictures (boss 3's HUD
+ * section: GIGA_SLASH / _R facing right, 2 per step, every SLASH_STEP frames); the X hits as the charged id */
+#define SLASH_WINDOW 40
+/* the blades' pace (user request 2026-11-13: "too short a gap"): a press within SLASH_GAP frames of the last blade
+ * waits (kept, not lost) and goes when the gap is over - mashing gave a blade every 9 frames; now one in 20 + its wind-up */
+#define SLASH_GAP 20
+static int slash_queued;
+#define SLASH_STEP 3
+static int slash_step = 2, slash_idle = 1000;
+static const signed char box_slash[3][4] = {{-14, -30, 28, 60}, {-14, -30, 28, 60}, {-18, -30, 36, 60}};
+static char *crescent[CRESCENT_MAX];
+static void crescent_fn(char *w, proj *q)
+{
+    int n = GIGA_SLASH_N / 3, f = (q->t / SLASH_STEP) % n;
+
+    if (q->c != f) {
+        q->c = f;
+        /* (facing right the mirrored pictures swap \\ and /: steps 0 / 1 swapped there, so the screen shows \\ / X
+         * either way) */
+        int s = VX(w) > 0 && q->b < 2 ? 1 - q->b : q->b;
+        proj_pose_look(w, HUD_TEX_INDEX, HUD_PAT + 2, (VX(w) > 0 ? GIGA_SLASH_R : GIGA_SLASH) + n * s + f);
+    }
+    O8(w, 0x29) &= ~0x40;   /* (the picture is turned already: the game's own mirror would turn it back - user report
+                             * 2026-11-12, it flew backwards; as Yammark's turned drones) */
+}
+static int crescent_out(void)
+{
+    int i, n = 0;
+    proj *q;
+    for (i = 0; i < CRESCENT_MAX; i++) {
+        q = crescent[i] ? proj_of(crescent[i]) : 0;
+        if (q && q->fn == crescent_fn)
+            n++;
+        else
+            crescent[i] = 0;
+    }
+    return n >= CRESCENT_MAX;
+}
+static void crescent_add(char *w)
+{
+    int i;
+    for (i = 0; w && i < CRESCENT_MAX; i++)
+        if (!crescent[i]) {
+            crescent[i] = w;
+            return;
+        }
+}
 static const signed char box_beam[4] = {-4, -16, 8, 32};
 #define X_GRAVITY(p) (*(volatile int *)((p) + 0x2A0))
 #define MIJ_LAND 50   /* frames of Mijinion's landing (boss_look land: anim 4 shortened) */
@@ -181,50 +231,16 @@ static void shards(int k, float x, float y, int n)
 static void aim(char *p, float x, float y, float speed, int *vx, int *vy)
 {
     char *e = find_target(x, y, 240);
-    float dx = e ? PX(e) - x : SX(p) * 100.0f, dy = e ? (PY(e) - 16) - y : 0.0f, d = sqrtf(dx * dx + dy * dy);
+    float ex = 0, ey = 0, dx, dy, d;
+    if (e)
+        objs_aim_point(e, &ex, &ey);   /* (where it was last hurt, else its hurt box: axl_objs.c) */
+    dx = e ? ex - x : SX(p) * 100.0f;
+    dy = e ? ey - y : 0.0f;
+    d = sqrtf(dx * dx + dy * dy);
     if (d < 1)
         d = 1;
     *vx = (int)(dx / d * speed * 65536);
     *vy = -(int)(dy / d * speed * 65536);
-}
-
-/* Heatnix's thrown fireball (BIN 35 sub 4): vx = dx * 0x400 (at most 3 px/f), vy -1/16, gravity 0x1000; where it
- * lands (or after a while) 3 shards at 5 px/f, at different angles k * 15 degrees of the upper half */
-static void fire_burst(float x, float y)
-{
-    int used = 0, n = 0, k;
-    float a;
-    while (n < 3) {
-        k = 1 + rand_n(11);
-        if (used >> k & 1)
-            continue;
-        used |= 1 << k;
-        n++;
-        a = k * 15 * 0.0174533f;
-        shot(3, x, y - 8, (int)(cosf(a) * 5 * 65536), (int)(sinf(a) * 5 * 65536), 1, 40, 0, 0, FX_FIREBALL, box_small);
-    }
-}
-
-static void fireball_fn(char *w, proj *q)
-{
-    if ((O8(w, 0xB0) & 8) || q->t >= 150) {
-        fire_burst(PX(w), PY(w));
-        proj_kill(w);
-        return;
-    }
-    VY(w) -= 0x1000;
-}
-
-static void fireball(char *p)
-{
-    float x = PX(p) + SX(p) * 16, y = PY(p) - 24, dx;
-    char *e = find_target(x, y, 240);
-    int vx;
-
-    dx = e ? PX(e) - x : SX(p) * 96.0f;
-    vx = (int)(dx * 0x400);
-    vx = vx > FXP(3) ? FXP(3) : vx < FXP(-3) ? FXP(-3) : vx;
-    shot(3, x, y, vx, -0x1000, FACE(p), 0, fireball_fn, P_KEEP, FX_FIREBALL, box_fire);
 }
 
 /* Mijinion's laser rain (BIN 40 sub 6, at the landing): 2 emitters moving -3 / +3 px/f, each 4 beams 12 frames
@@ -361,7 +377,7 @@ int moves_yam_ghosts(void)   /* test: the dash's afterimages up now */
 /* every changed frame (moves_after): the afterimages' palettes while any is out */
 static void yd_ghosts_frame(void)
 {
-    yd_pal = dna_ghost_palette(dna_boss == 1 && moves_yam_ghosts() > 0);
+    yd_pal = dna_ghost_palette((dna_boss == 1 || dna_boss == 3) && moves_yam_ghosts() > 0);
 }
 
 static void yd_input(char *p, int dash_new, int dash_held)
@@ -392,12 +408,85 @@ static void yd_input(char *p, int dash_new, int dash_held)
         O8(p, 0x29) = (O8(p, 0x29) & ~0x40) | (yd_dx > 0 ? 0x40 : 0);
 }
 
+/* Heatnix's dash (user request 2026-11-12: "the dash charged lets out the God Bird, not charged the plain dash"):
+ * a press is Yammark's X-style dash (yd_*) toward the held direction for HD_LEN frames at once; the button held on
+ * charges (X's glow and charge sound, axl_dna_bosses.c heat_charge_stage; user request 2026-11-12: "as X's charge
+ * shot, the press dashes, the hold charges"); let go full, the firebird rush (move 3: 8 px/f, invincible, the
+ * firebird's body hit). A giga or a move under way breaks the charge off. */
+#define HD_FULL 60
+#define HD_LEN 20
+#define HD_SOUND_AT 25
+static int hd_hold;
+static void move_start(char *p, int k);
+
+int moves_dash_charge(void)
+{
+    return dna_boss == 3 ? hd_hold : 0;
+}
+
+static void hd_input(char *p, int dash_new, int dash_held)
+{
+    unsigned short h = *(volatile unsigned short *)(p + 0xC0);   /* (HELD: 1 right, 2 left, 4 up, 8 down) */
+    int dx = h & 1 ? 1 : h & 2 ? -1 : 0, dy = h & 4 ? -1 : h & 8 ? 1 : 0, was = hd_hold, full, busy;
+
+    busy = move_k || dna_giga_look() >= 0;   /* (the God Bird, a giga: no dash now) */
+    if (dna_leaving()) {
+        hd_hold = 0;
+    } else if (dash_new) {   /* a press: the plain dash at once (not during the God Bird / a giga), the hold from
+                              * here charges (as X's buster: a shot at the press, the charge after - user request
+                              * 2026-11-12; pressed again in the God Bird it charged nothing, user report: now it does) */
+        if (!busy && axl_part_full() && skill_try(SK_DASH)) {   /* the Ultimate Buster: the God Bird at once (user
+                                                                  * request 2026-11-12) */
+            yd_left = 0;
+            move_start(p, 3);
+            axl_voice(SND_HEAT_GODBIRD);
+            hd_hold = 0;
+            return;
+        }
+        if (!busy) {
+            if (!dx && !dy)
+                dx = SX(p);
+            yd_left = HD_LEN;
+            yd_n = 0;
+            yd_dx = dx;
+            yd_dy = dy;
+            axl_sound(SND_DASH);
+        }
+        hd_hold = !axl_part_full();   /* (the Ultimate Buster: the God Bird comes at the press - no charge, no glow,
+                                       * user report 2026-11-14) */
+        if (test_on)
+            test_log("heat dash %d %d%s", dx, dy, busy ? " (charge only)" : "");
+    } else if (dash_held) {
+        if (hd_hold && hd_hold < HD_FULL)
+            hd_hold++;
+    } else if (hd_hold) {   /* let go: full, the God Bird (the plain dash, if still on, cut short) */
+        full = hd_hold >= HD_FULL;
+        hd_hold = 0;
+        if (test_on)
+            test_log("heat dash let go (%s)", full ? (busy ? "full, busy" : "god bird") : "short");
+        if (full && !busy && skill_try(SK_DASH)) {
+            yd_left = 0;
+            move_start(p, 3);
+            axl_voice(SND_HEAT_GODBIRD);   /* "God Bird!" (user request 2026-11-12) */
+        }
+    }
+    if (was < HD_SOUND_AT && hd_hold >= HD_SOUND_AT)
+        axl_sound(SND_CHARGE);
+    else if (was >= HD_SOUND_AT && hd_hold < HD_SOUND_AT)
+        axl_sound_stop(SND_CHARGE);
+    if (!yd_left)
+        return;
+    *(volatile unsigned short *)(p + 0xC0) = h & ~3;   /* (its own way: left / right do not walk him meanwhile) */
+    if (yd_dx)
+        O8(p, 0x29) = (O8(p, 0x29) & ~0x40) | (yd_dx > 0 ? 0x40 : 0);
+}
+
 static void yd_after(char *p)
 {
     float v = yd_dx && yd_dy ? YD_V * 0.70710678f : YD_V;
     int i;
 
-    if (dna_boss != 1 || dna_pose || dna_leaving()) {
+    if ((dna_boss != 1 && dna_boss != 3) || dna_pose || dna_leaving()) {
         yd_left = 0;
         return;
     }
@@ -416,7 +505,8 @@ static void yd_after(char *p)
         if ((yd_dy < 0 && (proj_terrain(p) & 4)) || (yd_dy > 0 && (proj_terrain(p) & 8)))
             PY(p) -= yd_dy * v;
     }
-    if (yd_n++ % YD_GHOST_GAP == 0)
+    if (yd_n++ % YD_GHOST_GAP == 1)   /* (from its second frame: the picture drawn last is the dash's by then - the
+                                        * first showed the pose before it, Heatnix's wings up, user report 2026-11-12) */
         for (i = 0; i < YD_GHOSTS; i++)
             if (!yd_ghost[i] || !proj_of(yd_ghost[i]) || proj_of(yd_ghost[i])->fn != yd_ghost_fn) {
                 char *w = proj_spawn(0, PX(p), PY(p), 0, 0, FACE(p), YD_GHOST_LIFE, yd_ghost_fn,
@@ -438,11 +528,12 @@ static void yd_after(char *p)
 static void clone_fn(char *w, proj *q)
 {
     char *e = find_target(PX(w), PY(w), 200);
-    float dx, dy, d;
+    float dx, dy, d, ex, ey;
     if (!e)
         return;
-    dx = PX(e) - PX(w);
-    dy = (PY(e) - 16) - PY(w);
+    objs_aim_point(e, &ex, &ey);
+    dx = ex - PX(w);
+    dy = ey - PY(w);
     d = sqrtf(dx * dx + dy * dy);
     if (d < 1)
         return;
@@ -735,7 +826,11 @@ void moves_reset(char *p)
     move_k = 0;
     seq_n = 0;
     seq_t = 0;
+    slash_queued = 0;
     yd_left = 0;
+    if (hd_hold >= HD_SOUND_AT)
+        axl_sound_stop(SND_CHARGE);
+    hd_hold = 0;
     yd_pal = dna_ghost_palette(0);   /* (the afterimages' palettes given back) */
     wolf_st = 0;
     wolf_body = 0;
@@ -770,6 +865,10 @@ int moves_look(void)
                wolf_st == W_LEAP ? 8 : 9;
     if (move_k & 0x800)                           /* (a move's landing: Mijinion's drop) */
         return 3;
+    if (dna_boss == 3 && yd_left)                 /* Heatnix's plain dash: his wings-level picture (look cdash) */
+        return 7;
+    if (seq_n && seq_k == 3 && slash_step < 2)   /* Heatnix's wing swings (the 3-step blade's \\ and /) */
+        return slash_step == 0 ? 6 : 8;
     if (move_k & 0x300 || seq_n)
         return 2;
     return move_k ? 1 : 0;
@@ -830,8 +929,12 @@ int moves_before(char *p, int dash_new, int dash_held, int alt_new)
     }
     if (k != 2 && wolf_st)
         wolf_end(p);
+    if (slash_idle < 1000)
+        slash_idle++;
     if (k == 1)
         yd_input(p, dash_new, dash_held);
+    else if (k == 3)
+        hd_input(p, dash_new, dash_held);
     else
         yd_left = 0;
     if (k == 2 && wolf_input(p, dash_new, alt_new)) {
@@ -846,16 +949,31 @@ int moves_before(char *p, int dash_new, int dash_held, int alt_new)
         return 1;
     }
     /* (the dash and the second attack wait out their cooldowns, axl_skills.c: user decision 2026-11-02) */
-    if (!move_k && dash_new && k != 1 && !(k == 4 && !on_ground(STATE(p))) && !(k == 8 && on_ground(STATE(p))) &&
+    if (!move_k && dash_new && k != 1 && k != 3 && !(k == 4 && !on_ground(STATE(p))) && !(k == 8 && on_ground(STATE(p))) &&
         skill_try(SK_DASH))
         move_start(p, k);
-    if (alt_new && k != 1 && k != 2 && k != 7 && !seq_n && !((k == 4 || k == 6) && move_k) && skill_try(SK_SPECIAL)) {
+    if (k == 3 && (alt_new || slash_queued)) {   /* (Heatnix's blade: SLASH_GAP after the last one, the press kept) */
+        if (seq_n || slash_idle < SLASH_GAP) {
+            slash_queued = alt_new || slash_queued;
+            alt_new = 0;
+        } else {
+            alt_new = 1;
+            slash_queued = 0;
+        }
+    }
+    if (alt_new && k != 1 && k != 2 && k != 7 && !seq_n && !((k == 4 || k == 6) && move_k) &&
+        !(k == 3 && crescent_out()) && skill_try(SK_SPECIAL)) {
         /* the second attack (Wolfang's: wolf_input; Shark's leap and Turtloid's bounce not during a move) */
         seq_k = k;
         seq_t = 0;
         seq_n = k == 2 ? 4 : k == 8 ? 3 : k == 5 ? 3 : k == 4 ? 0 : 1;
-        if (k == 3)
-            seq_t = 26;                           /* Heatnix's throw: the fireball at t = 26 of anim 5 */
+        if (k == 3) {   /* the 3-step blade's step, its motion and its moment (user requests 2026-11-12): \\ from his
+                         * left wing, / from his right one (the user's drawings: look cshot / leap, the blade at t =
+                         * 8), the X with anim 6 (look alt, t = 18) */
+            slash_step = slash_idle <= SLASH_WINDOW ? (slash_step + 1) % 3 : 0;
+            slash_idle = 0;
+            seq_t = slash_step < 2 ? 8 : 18;
+        }
         if (k == 4 && !move_k) {                  /* Shark's leap and pound (sub 6): to the target's x, 0x50 above */
             char *e = find_target(PX(p), PY(p), 240);
             move_k = 4 | 0x100;
@@ -885,7 +1003,23 @@ int moves_before(char *p, int dash_new, int dash_held, int alt_new)
         y = PY(p) - 24;
         switch (seq_k) {
         case 2: aim(p, x, y, 7, &vx, &vy); shot(2, x, y, vx, vy, FACE(p), 120, 0, 0, FX_SHARD, box_small); seq_t = 8; break;
-        case 3: fireball(p); break;
+        case 3: {   /* the 3-step blade's next step */
+                    char *w;
+                    crescent_out();   /* (its slots of the gone ones freed) */
+                    slash_idle = 0;
+                    w = shot(slash_step == 2 ? 0x0C : 3, PX(p) + SX(p) * 16, PY(p) - 20, SX(p) * FXP(5), 0, FACE(p), 0,
+                             crescent_fn, P_PIERCE | P_WALL | (slash_step == 2 ? P_GIGA : 0), FX_FIRE,
+                             box_slash[slash_step]);
+                    if (w) {
+                        proj_of(w)->b = slash_step;
+                        proj_of(w)->c = -1;
+                        crescent_fn(w, proj_of(w));
+                    }
+                    crescent_add(w);
+                    if (test_on)
+                        test_log("heat blade step %d", slash_step);
+                } axl_sound(SND_HEAT_SHOT); axl_voice(SND_HEAT_TEYA); break;   /* (BIN 35 sub 0: 5 px/f
+                                                   * through walls; "Teya!", user request 2026-11-12) */
         case 5: shot(5, x, y + 12, SX(p) * FXP(3), 0, FACE(p), 120, 0, 0, FX_BALL, box_ball); seq_t = 10; break;
         case 8: shot(8, PX(p), PY(p) - 30 - 12 * seq_n, SX(p) * FXP(1), FXP(1), FACE(p), 180, clone_fn, P_PIERCE, FX_CLONE,
                      box_ray); seq_t = 6; break;

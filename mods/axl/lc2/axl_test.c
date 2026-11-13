@@ -122,13 +122,11 @@ char *find_target(float x, float y, int range);   /* axl_objs.c */
 
 #ifdef AXL_RELEASE
 /* the release build (lc2_hook.py --release): no harness at all - nothing read, nothing logged */
-int test_on;
 int test_frame;
 int test_clock_wall;
 int test_ghost;
 void test_init(void) {}
 void test_input(void) {}
-void test_log(const char *fmt, ...) { (void)fmt; }
 int test_key(int vk) { (void)vk; return 0; }
 void test_player(char *self, int phase) { (void)self; (void)phase; }
 void test_watch(void *addr) { (void)addr; }
@@ -218,7 +216,7 @@ static void st_dump(void)
 /* the user drives the game (wait_go): his keys and the real focus count; else the run is the script's alone */
 int test_user_drives(void)
 {
-    return go_used;
+    return go_used || (!n_runs && !n_steps);   /* (no script at all: a log-only run, the user plays) */
 }
 
 static BOOL CALLBACK raise_game(HWND h, LPARAM unused)
@@ -366,7 +364,7 @@ static const char *const NAMES[] = {"stage", "area", "state", "checkpoint", "liv
                                     "cd_shot", "cd_special", "cd_dash", "cd_giga", "hud", "changed", "flash_dir", "bullets", "flash_off",
                                     /* the kits (axl_dna_bosses.c dna_value) */
                                     "proj_live", "proj_fails", "hurt_raw", "hurt_extra", "hurt_pct", "dna_hits", "last_dmg",
-                                    "enemy_near", "yam_opts", "yam_snd", "yam_form", "yam_voice", "yam_capped", "yam_blasts", "yam_charging", "look", "xstate", "afterimg", "yam_dash", "yam_ghosts", "hud_dash",
+                                    "enemy_near", "yam_opts", "yam_snd", "yam_form", "yam_voice", "yam_capped", "yam_blasts", "heat_blasts", "magma_kills", "fire_blocked", "lava_blocked", "magma_boss_hits", "magma_shown", "yam_charging", "look", "xstate", "afterimg", "yam_dash", "yam_ghosts", "hud_dash",
                                     "eb_cleared", "giga_dmg", "hurtbox", "eshots"};
 
 static int parse_cond(char **tok, int n, cond_t *c)

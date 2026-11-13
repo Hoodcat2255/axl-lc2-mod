@@ -1,0 +1,36 @@
+# Magma Stream on a boss (user decision 2026-11-12: "bosses take big damage, not killed"): the intro's D-1000, the bot
+# fights it a little, then changed into Heatnix, the giga: the boss hit every MS_BOSS_GAP frames (magma_boss_hits),
+# its hit points down, still alive.
+holdany
+all_weapons
+seq
+wait free == 1 9000
+idle 30
+set 59 2
+pset 84 0
+pset C 2
+wait free == 0 600
+wait free == 1 3000
+god on
+energy full
+bot boss
+wait boss_hp > 20 2400
+idle 60
+bot off
+idle 20
+pset 14C 3
+press 4 S
+idle 100
+show boss_hp
+log magma_boss
+pset 1A0 40
+pset 1A1 2
+press 2 V
+idle 40
+log snap_magma_boss
+snap
+idle 90
+show boss_hp magma_boss_hits boss_alive
+expect magma_boss_hits >= 3 b3_magma_boss_hit
+expect boss_alive == 1 b3_magma_boss_lives
+end

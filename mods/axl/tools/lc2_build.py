@@ -521,6 +521,18 @@ YAM_VOICES = (
     (16, ('st01_b_PG02_ID07', ('yam_spiral.wav', 'st01_b_PG02_ID10')), 1),   # the giga: "Formation... Spiral!" (the
                                                                      # user's file, user request 2026-11-11)
 )
+# Heatnix's voices (user request 2026-11-12), his clips (em34 st03_b PG02, by whisper): ID00 "Ryaaa!", ID02 "Magma
+# Stream!", ID03 "Ha!", ID04 "God Bird!", ID05 "Teya!" (01 / 06 / 07 hurt). In pl00 program 2's last free requests
+# (14 / 15, beside Yammark's 16 / 17): the God Bird (the charged dash) and the giga's start; the shot's and the
+# special's in X's 9 / 12 (user request 2026-11-12). (rid, parts, speed, bank)
+HEAT_VOICES = (
+    (14, ('st03_b_PG02_ID04',), 1, 'em34'),   # the charged dash: "God Bird!"
+    (15, (('heat_extreme.wav', 'st03_b_PG02_ID02'),), 1, 'em34'),   # the giga: "Magma Extreme!" (sound/, an AI voice
+                                                                   # made from his clips, user request 2026-11-12;
+                                                                   # without it his "Magma Stream!")
+    (9, ('st03_b_PG02_ID03',), 1, 'em34'),    # the shot: "Ha!" (X's request 9 / 12: never played for Axl in the test
+    (12, ('st03_b_PG02_ID05',), 1, 'em34'),   # logs; the game's own go to the shot, axl_hook.c se_hook) / the special: "Teya!"
+)
 CHANGE_SOUND = (27, ('concat', ['41_a_copy_shot', '33_a_hensin']))
 # the copy shot's charge (user request 2026-10-27: X's charge sound): X's charge loop (its request 7, 1.35 s, the tail
 # looped; X's code stops request 7 while X is not charging) copied to a free special-weapon slot, request 29
@@ -555,7 +567,7 @@ def request_wave(arc, rid):
 def sound_entries(arc):
     """every wave entry put_sounds writes"""
     out = {'X6\\sound\\' + t for t in AXL_SOUNDS}
-    out |= {request_wave(arc, r) for r in list(BOSS_SOUNDS) + [r for r, *_ in YAM_VOICES] + [CHANGE_SOUND[0], CHARGE_SOUND[0], HOVER_SOUND[0],
+    out |= {request_wave(arc, r) for r in list(BOSS_SOUNDS) + [r for r, *_ in YAM_VOICES + HEAT_VOICES] + [CHANGE_SOUND[0], CHARGE_SOUND[0], HOVER_SOUND[0],
                                                            READY_SOUND[0], IKUZO_SOUND[0],
                                                            SIREN_SOUND[0]]}
     return out
@@ -676,9 +688,11 @@ def put_sounds(arc):
         assert len(src) == 1, (em, wav, src)
         arc.put(request_wave(arc, rid), H_WAV, boss[em].get(src[0], H_WAV))
         done += 1
-    if 'em31' not in boss:
-        boss['em31'] = F.Arc(os.path.join(F.ROMPC, 'em31.arc'))
-    for rid, parts, speed in YAM_VOICES:
+    for em in ('em31', 'em34'):
+        if em not in boss:
+            boss[em] = F.Arc(os.path.join(F.ROMPC, em + '.arc'))
+    for rid, parts, speed, *bank in [v for v in YAM_VOICES] + [v for v in HEAT_VOICES]:
+        em = bank[0] if bank else 'em31'
         pcm = []
         for w in parts:
             if isinstance(w, tuple):               # (the first of them there)
@@ -689,9 +703,9 @@ def put_sounds(arc):
                     continue
                 src = open(path, 'rb').read()
             else:
-                n = [e['name'] for e in boss['em31'].entries if e['hash'] == H_WAV and e['name'].endswith('\\' + w)]
+                n = [e['name'] for e in boss[em].entries if e['hash'] == H_WAV and e['name'].endswith('\\' + w)]
                 assert len(n) == 1, (w, n)
-                src = boss['em31'].get(n[0], H_WAV)
+                src = boss[em].get(n[0], H_WAV)
             pcm.append(np.frombuffer(subprocess.run(['ffmpeg', '-v', 'error', '-i', '-', '-ac', '1', '-ar', '48000',
                                                      '-f', 's16le', '-'], input=src, check=True,
                                                     capture_output=True).stdout, '<i2'))
@@ -756,6 +770,101 @@ def build_stsel(out):
     path = os.path.join(out, F.STSEL)
     open(path, 'wb').write(arc.build())
     print('wrote %s (%d bytes): PLAYER SELECT "AXL", "UNKNOWN"' % (path, os.path.getsize(path)))
+
+
+# the Japanese PLAYER SELECT (user request 2026-11-14): X's "エックス" (frame 5, tiles 6-9) -> "アクセル". The game has
+# no font for it (each name is a drawn word); hand-drawn glyphs looked like another font (2026-11-14 play: "폰트 스타일이
+# 너무 달라"), an earlier cut was uneven ("일정하지 않고 부자연스러워"; "アルティメット" is squeezed: 7 letters in 64 px), so
+# the 4 are cut from full-size words of the same texture: ア = "ファルコン"'s ァ (enlarged: STSEL_JP_FILL), ク =
+# "エックス"'s, セ = "プレイヤーセレクト"'s, ル = "ファルコン"'s. A cut's white outline (15) is redrawn round its fill (the
+# neighbours' outlines touch), the word centred in 64 px, 1 px overlapping outlines like the game's words; its 4 tiles go
+# to free ones (no 4 free in a row; tiles 6-9 are other frames' too).
+STSEL_JP_TEX = ('X6\\chr\\stage\\stsel\\stsel_000_keyboard', 'X6\\chr\\stage\\stsel\\stsel_000_pcpad')
+STSEL_JP_PAT = 'X6\\pat\\stage\\stsel\\stsel'
+STSEL_JP_TILES = (175, 176, 191, 192)
+STSEL_JP_CUT = {'ク': (6, 32, 44, 0), 'セ': (0, 53, 63, 0), 'ル': (10, 26, 37, 0)}   # first tile of the word's 16-px
+# strip, columns x0-x1 in it, rows moved
+# ア: the ァ cut was a row shorter and 2 px narrower than セ / ル ("ア 가 더 커야할 거 같아. 높이를 맞춰봐", 2026-11-14), so
+# it is the ァ's pixels enlarged by hand to their 11 rows (rows 3-13): the bar 1 px longer, the stem 1 row and 1 px
+# further down-left (# dark 1, o grey 13, + light 14; the outline drawn round it as the cuts')
+STSEL_JP_FILL = {'ア': ["..#########..",
+                       "..ooooooooo#.",
+                       "..+++++++oo#.",
+                       "......#.##o#.",
+                       ".....+o#oo#..",
+                       ".....+o#++...",
+                       ".....oo#.....",
+                       "....#oo#.....",
+                       "...+oo+......",
+                       "..+oo+.......",
+                       ".#o+........."]}
+
+
+def stsel_jp_glyph(img, c):
+    if c in STSEL_JP_FILL:
+        rows = STSEL_JP_FILL[c]
+        g = np.zeros((16, len(rows[0])), np.uint8)
+        for y, r in enumerate(rows):
+            g[3 + y] = [{'.': 0, '#': 1, 'o': 13, '+': 14}[ch] for ch in r]
+        fill = g > 0
+    else:
+        t, x0, x1, dy = STSEL_JP_CUT[c]
+        g = img[16 * (t // 16):16 * (t // 16) + 16, 16 * (t % 16) + x0:16 * (t % 16) + x1 + 1]   # (a word's tiles: a row)
+        fill = np.roll(np.pad((g > 0) & (g != 15), ((0, 0), (1, 1))), dy, 0)
+        g = np.roll(np.pad(g, ((0, 0), (1, 1))), dy, 0)
+    pad = np.pad(fill, 1)
+    near = np.zeros_like(fill)
+    for ry in (-1, 0, 1):
+        for rx in (-1, 0, 1):
+            near |= pad[1 + ry:17 + ry, 1 + rx:fill.shape[1] + 1 + rx]
+    return np.where(fill, g, np.where(near, 15, 0)).astype(np.uint8)
+
+
+def stsel_jp_word(img, text='アクセル'):
+    glyphs = [stsel_jp_glyph(img, c) for c in text]
+    word = np.zeros((16, 64), np.uint8)
+    x = (64 - sum(g.shape[1] for g in glyphs) + len(glyphs) - 1) // 2
+    for g in glyphs:   # (outlines overlap 1 px: a fill pixel wins over an outline)
+        cur = word[:, x:x + g.shape[1]]
+        word[:, x:x + g.shape[1]] = np.where((g > 0) & ((g != 15) | (cur == 0)), g, cur)
+        x += g.shape[1] - 1
+    return word
+
+
+def build_stsel_jp(out):
+    arc = F.Arc(F.orig_path(F.STSEL_JP))
+    for name in STSEL_JP_TEX:
+        raw = bytearray(arc.get(name, F.H_TEX))
+        w = (struct.unpack_from('<I', raw, 8)[0] >> 6) & 0x1fff
+        img = np.frombuffer(bytes(raw[20:]), np.uint8).reshape(-1, w).copy()
+        word = stsel_jp_word(img)
+        for i, tile in enumerate(STSEL_JP_TILES):
+            y0, x0 = 16 * (tile // 16), 16 * (tile % 16)
+            assert (np.isin(img[y0:y0 + 16, x0:x0 + 16], (0, F.TEX_PAD))).all(), name   # (free tiles)
+            img[y0:y0 + 16, x0:x0 + 16] = word[:, 16 * i:16 * i + 16]
+        arc.put(name, F.H_TEX, bytes(raw[:20]) + img.tobytes())
+    secs = F.pat_sections(arc.get(STSEL_JP_PAT, F.H_PAT))
+    assert [struct.unpack('<BBbb', r)[1] for r in secs[0][5]] == [6, 7, 8, 9], secs[0][5]
+    secs[0][5] = [struct.pack('<BBbb', 0, t, -32 + 16 * i, -8) for i, t in enumerate(STSEL_JP_TILES)]
+    arc.put(STSEL_JP_PAT, F.H_PAT, F.pat(secs))
+    path = os.path.join(out, F.STSEL_JP)
+    open(path, 'wb').write(arc.build())
+    print('wrote %s (%d bytes): PLAYER SELECT "アクセル"' % (path, os.path.getsize(path)))
+
+
+def build_kaiwa(out):
+    total = 0
+    for fn in F.KAIWA_ARCS:
+        arc = F.Arc(F.orig_path(fn))
+        names = F.kaiwa_x(arc)
+        assert names, fn
+        for name, lang in names:
+            data, n = F.kaiwa_axl(arc.get(name, F.H_KAIWA), lang)
+            assert n, (fn, name)
+            arc.put(name, F.H_KAIWA, data)
+            total += n
+        open(os.path.join(out, fn), 'wb').write(arc.build())
+    print('wrote %d stage archives: the dialogue names X -> Axl (%d)' % (len(F.KAIWA_ARCS), total))
 
 
 def build_kao(out):
@@ -828,6 +937,8 @@ def main(axl_dat=F.DAT['axl'], out=F.BUILT):
     lc2_dna.hud_header(hud_slot, hud)
     build_kao(out)
     build_stsel(out)
+    build_stsel_jp(out)
+    build_kaiwa(out)
     import lc2_credits                     # the sprite sheet's credits at the end of the staff roll
     lc2_credits.build_credits(out)
 
