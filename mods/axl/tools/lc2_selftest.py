@@ -71,8 +71,8 @@ def built(fn):
         return
     arc = F.Arc(path)
     orig = F.Arc(F.orig_path(fn))
-    added = [(F.TEX_NAME % (18 + k), h) for k in range(1, 12) for h in (F.H_TEX, F.H_COF)]   # DNA looks, boss shots, skill HUD,
-    # the turned muzzle flash
+    added = [(F.TEX_NAME % (18 + k), h) for k in range(1, 13) for h in (F.H_TEX, F.H_COF)]   # DNA looks, boss shots, skill HUD,
+    # the turned muzzle flash, Scaravich's kit (texture 30)
     check([(e['name'], e['hash']) for e in arc.entries if (e['name'], e['hash']) not in added] ==
           [(e['name'], e['hash']) for e in orig.entries], '%s: built entry list differs from shipped' % region)
     check(all(any((e['name'], e['hash']) == a for e in arc.entries) for a in added), '%s: DNA textures missing' % region)
@@ -83,9 +83,9 @@ def built(fn):
     changed.add(('X6\\chr\\com\\com00', F.H_CTEX))   # + the bosses' projectile texture (lc2_dna.fx_looks)
     import lc2_build
     changed |= {(n, lc2_build.H_WAV) for n in lc2_build.sound_entries(orig)}   # X8 / boss / change / charge sounds
-    for n, i, layout, pc in B.KAO_FACES:      # dialogue portraits: the face build as lc2_build makes it
+    for n, i, layout, pc, warp in B.KAO_FACES:   # dialogue portraits: the face build as lc2_build makes it
         import face
-        pal, tex = face.build(i, layout, pc=pc)
+        pal, tex = face.build(i, layout, pc=pc, warp=warp)
         changed |= {(F.KAO_TEX % n, F.H_TEX), (F.KAO_COL % n, F.H_COL)}
         check(arc.get(F.KAO_TEX % n, F.H_TEX)[20:20 + len(tex)] == tex and
               arc.get(F.KAO_COL % n, F.H_COL)[12:12 + len(pal)] == pal, '%s: portrait k_pl%02d' % (region, n))

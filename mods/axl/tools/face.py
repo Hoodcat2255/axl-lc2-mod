@@ -125,8 +125,16 @@ def hair_slope(f, n):
     return best[1]
 
 
-def axl_images(i, shift=None):
-    """the 80x64 portrait in each state: base, then with piece k; RGB arrays. shift = (dx, dy) (PC; else (SHIFT, 0))"""
+# LC2's White Axl (k_pl02: its pieces at the PS1 places, so SHIFT): no made-up hair columns at the right edge either -
+# they showed as streaks on the left of the flipped portrait (user report 2026-11-14, "화이트액셀 깨지는거"; Axl's
+# were fixed 2026-10-26). The face keeps SHIFT up to portrait column WARP_AT (his eye / mouth changes end at 33), the
+# rest (the back of his head) is his remaining columns spread to the edge (5 more over 44: each repeated once at most)
+WARP_AT = 36
+
+
+def axl_images(i, shift=None, warp=False):
+    """the 80x64 portrait in each state: base, then with piece k; RGB arrays. shift = (dx, dy) (PC; else (SHIFT, 0));
+    warp: (SHIFT only) the right edge from his own columns stretched, not continued (WARP_AT)"""
     sx, sy = shift or (SHIFT, 0)
     from PIL import Image
     im = np.array(Image.open(SHEET).convert('RGB'))
@@ -142,6 +150,11 @@ def axl_images(i, shift=None):
             out[:, sx:sx + 78] = f
             out[:, :sx] = f[:, :1]
             return out
+        if warp:
+            cols = [x - sx for x in range(WARP_AT)]
+            n = 80 - WARP_AT
+            cols += [WARP_AT - sx + int(round(j * (77 - (WARP_AT - sx)) / (n - 1))) for j in range(n)]
+            return f[:, cols]
         out[:, :78 + sx] = f[:, -sx:]
         # right edge (hair): continue the last columns along the hair strokes (measured: 5 columns right = 5 rows
         # down on the sheet) instead of mirroring them, which bent the hair tips (user report 2026-10-26)
@@ -162,11 +175,11 @@ def axl_images(i, shift=None):
     return states
 
 
-def build(i, map_name, pc=False):
+def build(i, map_name, pc=False, warp=False):
     """(palette 512 B, texture 8192 B) of Axl's face i laid out as X's portrait measured in map_name (PS1); pc: the
-    pieces where LC2 draws them (PC_PIECES; the base layout is the PS1 one)"""
+    pieces where LC2 draws them (PC_PIECES; the base layout is the PS1 one); warp: axl_images' (LC2's White Axl)"""
     layouts = json.load(open(os.path.join(WORK, map_name)))
-    states = axl_images(i, PC_SHIFT if pc else None)
+    states = axl_images(i, PC_SHIFT if pc else None, warp=warp and not pc)
     # layout -> state: the base has no piece texel (v 16-31, u 32-111); else the piece number
     def state_of(px):
         ks = {(u - 32) // 16 for y, x, u, v, _ in px if 16 <= v < 32 and 32 <= u < 112}

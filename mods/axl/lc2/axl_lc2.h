@@ -155,6 +155,20 @@ void axl_sound_stop(int id);           /* axl_dna.c: stops a pl00 request's soun
 extern int dna_pal_slot, menu_pal_lo;   /* our CLUT slots now (axl_dna.c clut_free_run) */
 int clut_free_run(int n, int lo, int hi);
 int moves_look(void);
+/* axl_scar.c: Ground Scaravich's kit (the ball, the orb, the giga's crush) */
+void scar_reset(void);
+int scar_before(char *p, int *dash_new);
+void scar_after(char *p);
+int scar_has_ball(void);
+int scar_flipping(void);
+int scar_waiting(void);   /* no ball held (kicked away, the next one coming): his low pose */
+void scar_kick(char *p);
+void scar_orb(char *p);
+int scar_hit_loss(char *e, int loss);
+int scar_giga(char *p, int t, int *pose);
+void scar_late(void);
+int scar_value(const char *name, int *ok);
+void world_freeze(int frames, void (*fn)(int t));   /* axl_menu.c: the play lines stand still, fn(t) each frame */
 #define GIGA_ANIM 231                   /* lc2_hook.GIGA_ANIM: anim GIGA_ANIM + i holds Giga picture i */
 #define FLAME_ANIM 246                  /* lc2_hook.FLAME_ANIM: anim FLAME_ANIM + i holds hover flame i */
 void dna_screen_flash(void);            /* axl_dna.c */
@@ -193,6 +207,9 @@ int objs_targets(float x, float y, int rx, int ry, char **out, int max);   /* ax
 #define SND_HEAT_SHOT 23
 #define SND_SCAR_KICK 25
 #define SND_SCAR_ROLL 26
+#define SND_SCAR_KICK_VO 36   /* pl00 36 / 37 / 11: Scaravich's kick / orb voices, the giga's "Chibaku Tensei" */
+#define SND_SCAR_ORB_VO 37    /* (lc2_build SCAR_VOICES) */
+#define SND_SCAR_GIGA_VO 11
 #define SND_CHANGE 27
 #define SND_CHARGE 29  /* pl00 request 29: X's charge loop copied there (lc2_build CHARGE_SOUND) */
 #define SND_COPY 10    /* pl00 request 10 = se_pl00_PG00_ID10: X8's copy shot (lc2_build AXL_SOUNDS) */

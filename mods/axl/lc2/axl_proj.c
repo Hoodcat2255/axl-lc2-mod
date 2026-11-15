@@ -15,6 +15,7 @@
  * own tables, so the bosses' weaknesses apply as for X's weapon of that number.
  */
 #include <windows.h>
+#include <math.h>
 
 #include "axl_lc2.h"
 #include "axl_proj.h"
@@ -30,7 +31,7 @@
 #define BOX_VT ((const void *)0x031DA67C)
 #define SCREEN (*(char **)0x041D8E58)
 #define MAP (*(char **)0x041D9124)
-#define REHIT 20   /* frames between two hits of a lasting projectile on one enemy */
+#define REHIT 10   /* frames between two hits of a lasting projectile on one enemy */
 #define OWNER_COUNT(p) O8(p, 0xBC + 0x95)
 
 typedef void(__fastcall *task_fn)(char *task);
@@ -210,6 +211,28 @@ int proj_live_dna(void)
     return n;
 }
 
+/* one of ours within r px of (x, y) (axl_dna_bosses.c dna_hit_loss: whose hit an enemy's loss was); *boosted: one of
+ * them has an id the game's Weapon Plus +1 takes already (RXC2 FUN_023cf8c0: ids 1-8, 0x0A-0x11, 0x34-0x36 with the
+ * parts word's bit 0x200000) */
+int proj_near(float x, float y, float r, int *boosted)
+{
+    int i, n = 0;
+    *boosted = 0;
+    for (i = 0; i < N_PROJ; i++) {
+        char *w = projs[i].w;
+        unsigned char id;
+        if (!w || !projs[i].live)
+            continue;
+        if (fabsf(*(volatile float *)(w + 0x14) - x) > r || fabsf(*(volatile float *)(w + 0x1C) - y) > r)
+            continue;
+        n++;
+        id = O8(w, 9);
+        if ((id >= 1 && id <= 8) || (id >= 0x0A && id <= 0x11) || (id >= 0x34 && id <= 0x36))
+            *boosted = 1;
+    }
+    return n;
+}
+
 void proj_kill_dna(void)
 {
     int i, n = 0;
@@ -325,6 +348,21 @@ char *proj_spawn(int id, float x, float y, int vx, int vy, int right, int life, 
     return q->w;
 }
 
+/* The game's rule against multi-hits, PC (RXC2 FUN_023cf8c0, the damage routine; PS1 FUN_800315cc): the weapon's hit
+ * number is byte + 0x2A of its component at + 0x74 = W+0x9E (not the PS1's +0x64 / W+0x8C, written until
+ * 2026-11-15: it stayed 0 here), the target's last one + 0x2B = its + 0x9F; the same number = no damage, 0 = always
+ * damage (and the target's cleared). So ours hit every frame they touched an enemy (user report 2026-11-15 "too
+ * strong"; log e2e scar_kit: 12 -> 6 -> 0 in two frames). */
+#define HITNO_AT 0x9E
+
+/* a fresh hit number (proj_update) */
+static unsigned char new_hitno(void)
+{
+    static unsigned char next;
+    next = next == 255 ? 1 : next + 1;
+    return next;
+}
+
 /* state 0: the game's set-up, then ours */
 static void __fastcall setup_hook(char *task)
 {
@@ -353,6 +391,11 @@ static void __fastcall setup_hook(char *task)
     O32(w, 0x40) = q->vy;
     O8(w, 0x29) = q->right ? 0x40 : 0;
     O8(w, 9) = q->id;
+    /* its hit number from the start: with the set-up's own (another number) its first hit test came before
+     * proj_update gave it ours, so a piercing one hit the same enemy on two frames running (log 2026-11-15, e2e
+     * scar_kit: Scaravich's new ball 12 -> 6 -> 0; user report "too strong") */
+    if (q->flags & (P_PIERCE | P_TOUGH))
+        O8(w, HITNO_AT) = q->hitno = new_hitno();
     if (q->box)
         apply_box(q);
     apply_look(q);
@@ -382,17 +425,14 @@ static void proj_update(char *task, char *w, proj *q)
     q->t++;
     if (q->flags & P_HUD)
         return;   /* (axl_hud.c places it, picks its frame and shows it after the unit pass) */
-    /* the game's own rule against multi-hits (PS1 FUN_800315cc): a weapon whose hit number (PS1 +0x64 = W+0x8C) is
+    /* the game's own rule against multi-hits (PS1 FUN_800315cc): a weapon whose hit number (HITNO_AT, above) is
      * the one the target was last hit by (its +0x65) does no damage. A piercing projectile keeps one number: each
      * enemy once (user request 2026-10-27); a lasting one (P_TOUGH: options, the dash body) takes a new number
      * every REHIT frames: the same enemy again after that. */
     if (q->flags & (P_PIERCE | P_TOUGH)) {
-        if (!q->hitno || ((q->flags & P_TOUGH) && q->t % REHIT == 0)) {
-            static unsigned char next;
-            next = next == 255 ? 1 : next + 1;
-            q->hitno = next;
-        }
-        O8(w, 0x8C) = q->hitno;
+        if (!q->hitno || ((q->flags & P_TOUGH) && q->t % REHIT == 0))
+            q->hitno = new_hitno();
+        O8(w, HITNO_AT) = q->hitno;
     }
     if (test_on && q->t == 5) {
         char hex[0xE0 * 2 + 1];

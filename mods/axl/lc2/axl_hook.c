@@ -402,6 +402,17 @@ static void __fastcall se_hook(void *mgr, void *edx, int kind, int id, char *obj
      * maybe) play Axl's shot instead */
     if (kind == 1 && (id == 9 || id == 12) && !axl_se_own)
         id = 8;
+    /* pl00 requests 14 / 16 carry Heatnix's "God Bird!" / Yammark's "Formation... Spiral!" (lc2_build HEAT_VOICES /
+     * YAM_VOICES): the game's own are dropped - 16 is X's saber hit, played on the guard-break bullet when it hits
+     * Nightmare Zero with the saber id (user report 2026-11-14: the Spiral voice there; logs 2026-11-08 guardweak,
+     * flames2: 'se kind 1 id 16' on the bullet right after 'guard bullet ... id 32'), 14 a Falcon armour sound on the
+     * player (log 2026-11-08 falcon) - the enemy's own hurt sound plays with the hit as ever */
+    if (kind == 1 && (id == 14 || id == 16) && !axl_se_own)
+        drop = 1;
+    /* pl00 11 / 36 / 37 carry Scaravich's giga / kick / orb voices (lc2_build SCAR_VOICES; X's charged shot and PG04
+     * sounds, none heard from Axl in the logs): the game's own dropped */
+    if (kind == 1 && (id == 11 || id == 36 || id == 37) && !axl_se_own)
+        drop = 1;
     if (test_on)
         test_log("se kind %d id %d obj %p%s%s", kind, id, obj, obj && obj == axl_p ? " (player)" : "",
                  drop ? " dropped" : "");

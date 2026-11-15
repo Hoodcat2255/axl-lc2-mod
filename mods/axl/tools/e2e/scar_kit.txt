@@ -1,0 +1,109 @@
+# Ground Scaravich's kit (user design 2026-11-14; axl_scar.c): changed into Scaravich on the intro, the size-1 ball
+# held in front at once; walking right grows it (every 160 px walked: the world stands still while it swells, log
+# 'scar ball grows'); left does not walk him while he holds it (he faces right); the dash rolls him round it (he
+# faces left after, log 'scar flip end'); the shot kicks it away (log 'scar kick'), the next one drops from above and
+# is caught; the special fires the fist's orb; the giga kicks the core at the first enemy and crushes it in the
+# cut-scene (log 'scar giga crush').
+all_weapons
+hpwatch 7990
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1080 4
+idle 40
+pset 14C 5
+press 4 S
+idle 100
+log scar_start
+show scar_size scar_state
+expect scar_size == 1 b5_ball_at_once
+log snap_held
+snap
+press 2 RIGHT
+idle 4
+mark
+press 20 LEFT
+show dx
+expect dx >= -2 b5_no_walk_back
+log scar_walk
+press 140 RIGHT
+idle 30
+show scar_size scar_grows scar_dist
+expect scar_grows >= 1 b5_grows
+log snap_grown
+snap
+log scar_flip
+press 2 A
+idle 40
+show scar_flips
+expect scar_flips == 1 b5_flip
+log snap_flipped
+snap
+press 2 RIGHT
+log scar_kick
+press 2 X
+idle 40
+show scar_kicks scar_state
+expect scar_kicks == 1 b5_kick
+mark
+press 8 LEFT
+show dx scar_state
+expect dx == 0 b5_no_walk_without_ball
+press 2 A
+idle 12
+show scar_flips
+expect scar_flips == 2 b5_turn_without_ball
+log snap_rolling
+snap
+idle 80
+show scar_state scar_size
+expect scar_state == 2 b5_new_ball_caught
+log snap_new_ball
+snap
+log scar_orb
+press 2 S
+idle 20
+show scar_orbs
+expect scar_orbs == 1 b5_orb
+log snap_orb
+snap
+idle 30
+log scar_giga
+pset 1A0 40
+pset 1A1 2
+press 2 V
+idle 40
+log snap_core
+snap
+idle 80
+log snap_cut_1
+snap
+idle 80
+log snap_cut_2
+snap
+idle 80
+log snap_cut_3
+snap
+idle 80
+log snap_cut_4
+snap
+idle 80
+log snap_cut_5
+snap
+idle 80
+log snap_cut_6
+snap
+idle 80
+log snap_cut_7
+snap
+idle 80
+log snap_cut_8
+snap
+idle 60
+show scar_crushes
+expect scar_crushes >= 1 b5_crush
+log snap_after
+snap
+end

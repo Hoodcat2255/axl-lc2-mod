@@ -79,7 +79,24 @@ static int adash_right;        /* the air dash's way */
 #define ANIM_LADDER_AIM 183   /* + 0 up, 1 up-diagonal, 2 down-diagonal, 3 down: bank B 74-77 (lc2_hook.PC_SCRIPTS) */
 #define HOVER_MAX 50
 #define GLIDE_DIV 4
-#define AIR_DASH 20
+/* the air dash as the armoured X's (user decision 2026-11-16 "원작과 똑같이"; docs/research-axl-air-dash-hyper-dash-
+ * 20261116.md): out at the air-dash speed, slowed each frame down to the dash speed, 18 frames - with Hyper Dash
+ * (parts bit 0x10) faster, slowed less and 10 frames (PC FUN_020b3bb0 / FUN_020b3e00: P+0x270 / 0x274 / 0x278; PS1
+ * FUN_8003b298's timer). Until 2026-11-16: 20 frames at the dash-jump speed, Hyper Dash's air-dash fields unread. */
+#define AIR_DASH 18
+#define AIR_DASH_HYPER 10
+#define ADASH_V0 0x68000           /* 6.5 px/f (Hyper Dash 8.125) */
+#define ADASH_V0_HYPER 0x82000
+#define ADASH_VMIN 0x42000         /* 4.125 (5.156) */
+#define ADASH_VMIN_HYPER 0x52800
+#define ADASH_SLOW 0x3000          /* (0x2400) a frame */
+#define ADASH_SLOW_HYPER 0x2400
+#define PART_HYPER 0x10u
+#define DASH_SPEED(p) O32(p, 0x274)   /* X's dash speed: his air control's with the dash-jump flag (FUN_020ad1b0) */
+static int part_hyper;             /* this frame: Hyper Dash worn (charge_hide) */
+#define PART_WEAPON_PLUS 0x200000u
+int axl_part_weapon;               /* this frame: Weapon Plus worn (charge_hide; axl_dna_bosses.c dna_hit_loss) */
+static int adash_len, adash_v, adash_saved, adash_swapped;
 
 /* X's on-screen limit per shot id (FUN_02426980; the second table with the parts bit 0x40000) */
 #define SHOT_LIMIT ((volatile u8 *)0x03483BA8)
@@ -432,6 +449,11 @@ static void shoot_after(char *p, int was)
     }
 }
 
+int axl_adash_left(void)   /* test 'adash' */
+{
+    return adash_t;
+}
+
 static void hover_before(char *p)
 {
     int jump_new = (NEWP(p) & B_JUMP) != 0;
@@ -441,8 +463,13 @@ static void hover_before(char *p)
      * wall kick never came) - then the way he kicks off (facing), not the held way back into the wall */
     if (!in_air(STATE(p)) && STATE(p) != ST_WALL_KICK)
         adash_t = 0;
-    else if (!adash_used && !shooting && (NEWP(p) & B_DASH)) {   /* (not while shooting: user request 2026-10-26) */
-        adash_t = AIR_DASH;
+    /* (not in a dash jump, as the armoured X: user report 2026-11-16; PS1 FUN_8003906c refuses the air dash while the
+     * dash's kind byte +0x86 is set - the ground dash sets it (FUN_8003a9c4), so a dash jump keeps it; a plain jump
+     * clears it. Out of a wall kick still: user request 2026-10-29) */
+    else if (!adash_used && !shooting && (NEWP(p) & B_DASH) && (!DASH_JUMP(p) || STATE(p) == ST_WALL_KICK)) {
+        /* (not while shooting: user request 2026-10-26) */
+        adash_t = adash_len = part_hyper ? AIR_DASH_HYPER : AIR_DASH;
+        adash_v = part_hyper ? ADASH_V0_HYPER : ADASH_V0;
         adash_used = 1;
         hovering = 0;
         axl_sound(SND_DASH);   /* (our own move: X's code plays nothing for it - user report 2026-10-29) */
@@ -459,9 +486,23 @@ static void hover_before(char *p)
             test_log("air dash start state %d facing %s held %04X c2 %04X c6 %04X -> %s", STATE(p), (FACING(p) & FACE_RIGHT) ? "right" : "left",
                      HELD(p), O16(p, 0xC2), O16(p, 0xC6), adash_right ? "right" : "left");
     }
+    /* (White Axl = the Ultimate: X's own air dash came too on the same press, two dashes - user report 2026-11-16; in
+     * the air the dash press is the mod's alone) */
+    if (in_air(STATE(p)) || STATE(p) == ST_WALL_KICK)
+        NEWP(p) &= ~B_DASH;
     if (adash_t) {
         adash_t--;
-        DASH_JUMP(p) = 1;
+        DASH_JUMP(p) = adash_t != 0;   /* (the armoured X's ends at the walk's speed) */
+        /* its speed through X's air control's (the dash speed, put back in hover_after) */
+        adash_saved = DASH_SPEED(p);
+        adash_swapped = 1;
+        DASH_SPEED(p) = adash_v;
+        {
+            int vmin = part_hyper ? ADASH_VMIN_HYPER : ADASH_VMIN;
+            adash_v -= part_hyper ? ADASH_SLOW_HYPER : ADASH_SLOW;
+            if (adash_v < vmin)
+                adash_v = vmin;
+        }
         if (adash_right)   /* (kept: X's kick turns him to the wall each frame) */
             FACING(p) |= FACE_RIGHT;
         else
@@ -475,7 +516,13 @@ static void hover_before(char *p)
     /* hover: a new jump press in the air (not in a dash jump), or shooting once he no longer rises */
     /* (White Axl: again and again in one jump, user request 2026-10-27: shooting again after a pause keeps him up;
      * a jump press too, so the Ultimate's own hover never gets one) */
-    if (!hovering && (!hover_used || armor() == 4) && in_air(STATE(p)) &&
+    /* (never changed into a boss: the walkers' jump is the boss's own, user request 2026-11-15 "변신했을 때 호버링 되면
+     * 안돼" - Scaravich's kick in the air held him up; the flyers fly, axl_x.c flight) */
+    if (dna_boss && hovering) {
+        hovering = 0;
+        GRAVITY(p) = X_GRAVITY(p);
+    }
+    if (!hovering && !dna_boss && (!hover_used || armor() == 4) && in_air(STATE(p)) &&
         ((jump_new && !DASH_JUMP(p)) || (shooting && VY(p) <= 0))) {
         hovering = hover_used = 1;
         hover_t = 0;
@@ -510,6 +557,11 @@ static void hover_after(char *p)
 {
     int st = STATE(p);
 
+    if (adash_swapped) {
+        DASH_SPEED(p) = adash_saved;
+        adash_swapped = 0;
+    }
+
     if (!in_air(st)) {
         if (hovering || gliding)
             GRAVITY(p) = X_GRAVITY(p);
@@ -526,7 +578,7 @@ static void hover_after(char *p)
         }
         /* its picture by time: after an air shot X sets its own anim back every frame and the dash anim started
          * over on its first picture, a half pose (user report 2026-10-27) */
-        O8(p, 0x66) = AIR_DASH - adash_t <= 1 ? 71 : adash_frames[adash_t & 1];
+        O8(p, 0x66) = adash_len - adash_t <= 1 ? 71 : adash_frames[adash_t & 1];
     } else if (!adash_t && ANIM(p) == ANIM_AIR_DASH)
         set_anim(p, ANIM_FALL);
     if (hovering) {
@@ -1236,6 +1288,8 @@ static void charge_hide(char *p)
         part_quick = ((hidden_parts | eq) & PART_QUICK) != 0;
         part_rapid = ((hidden_parts | eq) & PART_RAPID) != 0;
         axl_pierce = ((hidden_parts | eq) & PART_SPEED) != 0;
+        part_hyper = ((hidden_parts | eq) & PART_HYPER) != 0;
+        axl_part_weapon = ((hidden_parts | eq) & PART_WEAPON_PLUS) != 0;
     }
     *OPT_BYTE = (unsigned char)(hidden_opt & ~3);   /* (bit 1, held = rapid fire, too: Axl fires so anyway - user
                                                      * request 2026-10-29, the option on or off no difference) */
@@ -1366,7 +1420,7 @@ static char *hold_boss;          /* the boss held this fight (0 none yet) */
 int axl_hold_any;                /* test 'holdany' (axl_test.c) */
 static unsigned hold_until;      /* frame_count the hold ends */
 
-/* o: the Maverick of this stage (1-8: not the boss rematch rooms, scenes 19-22, nor Sigma, nor other bosses - user
+/* o: the Maverick of this stage (1-8: not the Another Routes, 19-22 (docs/stage_numbers.md), nor the rematch rooms (12), nor Sigma, nor other bosses - user
  * request 2026-11-08) in a fight whose DNA Axl lacks */
 static int hold_target(char *o)
 {
@@ -2543,13 +2597,31 @@ static void afterimage_colours(char *p)
 typedef void(__fastcall *x_pal_t)(void *game);
 #define X_PAL_UPLOAD ((x_pal_t)0x023AC680)
 
+/* Axl's own body palettes, kept when they are made white: Axl again (another game started without the stage load
+ * that brings a fresh blob) gets them back (user report 2026-11-14: "액셀을 골랐는데, 화이트액셀이 나왔다" - after a
+ * White Axl game the next Axl one stayed white; his portrait was Axl's) */
+static unsigned short body_saved[BODY_PALS_MAX][16];
+static unsigned short *saved_blob;
+
 static void white_axl(void)
 {
     char *res = CLUT_OWNER_P ? *(char **)((char *)CLUT_OWNER_P + 0x281C4) : 0;
     unsigned short *blob = res ? *(unsigned short **)(res + 0x6C) : 0;
     unsigned i;
 
-    if (armor() != 4 || !blob || !*(void **)0x041D8C8C || !memcmp(blob + 16 * body_pals[0], white_pal, sizeof white_pal))
+    if (!blob || !*(void **)0x041D8C8C)
+        return;
+    if (armor() != 4) {
+        if (blob == saved_blob && !memcmp(blob + 16 * body_pals[0], white_pal, sizeof white_pal)) {
+            for (i = 0; i < N_BODY_PALS; i++)
+                memcpy(blob + 16 * body_pals[i], body_saved[i], sizeof body_saved[i]);
+            X_PAL_UPLOAD(*(void **)0x041D8C8C);
+            if (test_on)
+                test_log("white axl: Axl's palettes back (armor %d)", armor());
+        }
+        return;
+    }
+    if (!memcmp(blob + 16 * body_pals[0], white_pal, sizeof white_pal))
         return;
     if (memcmp(blob + 16 * body_pals[0], axl_body_pal, sizeof axl_body_pal)) {   /* not Axl's blob: left alone */
         static void *warned;
@@ -2558,8 +2630,11 @@ static void white_axl(void)
         warned = blob;
         return;
     }
-    for (i = 0; i < N_BODY_PALS; i++)
+    for (i = 0; i < N_BODY_PALS; i++) {
+        memcpy(body_saved[i], blob + 16 * body_pals[i], sizeof body_saved[i]);
         memcpy(blob + 16 * body_pals[i], white_pal, sizeof white_pal);
+    }
+    saved_blob = blob;
     X_PAL_UPLOAD(*(void **)0x041D8C8C);
     if (test_on)
         test_log("white axl: palettes %u", (unsigned)N_BODY_PALS);

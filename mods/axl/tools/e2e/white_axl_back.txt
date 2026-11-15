@@ -1,0 +1,19 @@
+# White Axl's palettes given back (user report 2026-11-14: after a White Axl game the next Axl one stayed white;
+# axl_x.c white_axl): the armour byte (st + 0x9A) made 4 - the body palettes go white (log 'white axl: palettes') -,
+# then 0 again - Axl's own come back (log "white axl: Axl's palettes back").
+hpwatch 7990
+seq
+wait free == 1 9000
+god on
+idle 40
+log snap_axl
+snap
+set 9A 4
+idle 30
+log snap_white
+snap
+set 9A 0
+idle 30
+log snap_back
+snap
+end

@@ -1,0 +1,22 @@
+# Probe (2026-11-15): Scaravich's orb from his arm cannon's muzzle (axl_scar.c scar_orb) - the special with no
+# enemy near (straight ahead), snaps as it leaves.
+all_weapons
+hpwatch 7990
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 200 1080 4
+idle 40
+pset 14C 5
+press 4 S
+idle 100
+press 2 S
+idle 10
+log snap_orb_a
+snap
+idle 3
+log snap_orb_b
+snap
+end

@@ -163,7 +163,7 @@ typedef struct {
     unsigned char vk[8];
     char text[48];
 } step_t;
-enum { S_TRACE, S_NOLIFT, S_SHOW, S_MARK, S_UNCHANGE, S_GHOST, S_ENERGY, S_SURVEY, S_BSET, S_GOTO, S_WAIT, S_EXPECT, S_PRESS, S_IDLE, S_TALK, S_HOLD, S_RELEASE, S_SET, S_PSET, S_GOD, S_BOT, S_SNAP, S_LOG, S_OBJS, S_GDUMP, S_GWATCH, S_BWATCH, S_OWATCH, S_XWATCH, S_END };
+enum { S_TRACE, S_NOLIFT, S_SHOW, S_MARK, S_UNCHANGE, S_GHOST, S_ENERGY, S_SURVEY, S_BSET, S_GOTO, S_WAIT, S_EXPECT, S_PRESS, S_IDLE, S_TALK, S_HOLD, S_RELEASE, S_SET, S_PSET, S_GOD, S_BOT, S_SNAP, S_LOG, S_OBJS, S_GDUMP, S_GWATCH, S_BWATCH, S_OWATCH, S_XWATCH, S_SE, S_END };
 #define MAX_STEPS 8192   /* (moves_intro: about 8000 steps) */
 static step_t steps[MAX_STEPS];
 static float mark_x, mark_y, mark_top;   /* mark: the place then, the highest point (least y) since */
@@ -365,7 +365,9 @@ static const char *const NAMES[] = {"stage", "area", "state", "checkpoint", "liv
                                     /* the kits (axl_dna_bosses.c dna_value) */
                                     "proj_live", "proj_fails", "hurt_raw", "hurt_extra", "hurt_pct", "dna_hits", "last_dmg",
                                     "enemy_near", "yam_opts", "yam_snd", "yam_form", "yam_voice", "yam_capped", "yam_blasts", "heat_blasts", "magma_kills", "fire_blocked", "lava_blocked", "magma_boss_hits", "magma_shown", "yam_charging", "look", "xstate", "afterimg", "yam_dash", "yam_ghosts", "hud_dash",
-                                    "eb_cleared", "giga_dmg", "hurtbox", "eshots"};
+                                    "eb_cleared", "giga_dmg", "hurtbox", "eshots",
+                                    "scar_size", "scar_state", "scar_dist", "scar_grows", "scar_kicks", "scar_flips",
+                                    "scar_orbs", "scar_crushes", "scar_cut", "adash"};
 
 static int parse_cond(char **tok, int n, cond_t *c)
 {
@@ -446,6 +448,11 @@ static void parse_step(char **tok, int n)
         t->op = S_UNCHANGE;
     else if (!strcmp(tok[0], "release"))
         t->op = S_RELEASE;
+    else if (!strcmp(tok[0], "se") && n == 3) {   /* se KIND ID: a sound request, on no object (bank checks) */
+        t->op = S_SE;
+        t->v = atoi(tok[1]);
+        t->n = atoi(tok[2]);
+    }
     else if (!strcmp(tok[0], "bset") && n == 3) {
         t->op = S_BSET;
         t->off = (int)strtoul(tok[1], NULL, 16);
@@ -783,6 +790,10 @@ static int value_of(const char *name, int *ok)
         if (!strcmp(name, "dna_shots")) {   /* live boss-attack projectiles (axl_proj.c) */
             int proj_live_dna(void);
             return proj_live_dna();
+        }
+        if (!strcmp(name, "adash")) {   /* the air dash's frames left (axl_x.c) */
+            int axl_adash_left(void);
+            return axl_adash_left();
         }
         if (!strcmp(name, "dx"))   /* (from the last mark) */
             return (int)(*(volatile float *)(p + 0x14) - mark_x);
@@ -1252,6 +1263,11 @@ static void seq_frame(void)
         case S_UNCHANGE: {
             void dna_test_end(void);   /* axl_dna.c */
             dna_test_end();
+            break;
+        }
+        case S_SE: {
+            void axl_se_test(int kind, int id);   /* axl_dna.c */
+            axl_se_test(t->v, t->n);
             break;
         }
         case S_GHOST:

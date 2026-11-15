@@ -251,6 +251,21 @@ static int owned(char *p, int k)
     return k >= 1 && k <= 8 && (OWNED(p) >> (k - 1) & 1);   /* the beaten bosses (every energy is full anyway) */
 }
 
+/* the change started in X's ground dash (state 12): his standing state instead - the dash's speed and time went on
+ * under the pose and, with the Hyper Dash part (its faster dash fields), threw the boss forward into a wall the moment
+ * the pose ended, crushing him (user report 2026-11-14: "dna 파츠를 끼고 대시 상태에서 변신을 하면 갑자기 앞으로 팅기면서 벽에
+ * 낑겨 사망") */
+#define ST_DASH 12
+static void dash_state_end(char *p)
+{
+    if (STATE(p) != ST_DASH)
+        return;
+    O8(p, 0x0D) = 2;
+    O8(p, 0x0E) = 0;
+    if (test_on)
+        test_log("dna: the change in a dash - standing");
+}
+
 static void pose_done(char *p)
 {
     if (ANIM(p) == ANIM_DNA)
@@ -504,6 +519,18 @@ void axl_voice(int id)
         test_log("voice %d", id);
 }
 
+#ifndef AXL_RELEASE
+void axl_se_test(int kind, int id)   /* the harness's 'se KIND ID' */
+{
+    if (!SE_MGR)
+        return;
+    axl_se_own = 1;
+    SE_PLAY(SE_MGR, 0, kind, id, 0);
+    axl_se_own = 0;
+    test_log("se test kind %d id %d", kind, id);
+}
+#endif
+
 void axl_sound(int id)
 {
     if (!SE_MGR || !axl_p)
@@ -647,6 +674,7 @@ int dna_before(char *p, int special_new, int busy)
             last_hp = HP(p);
             taken_acc = dna_hurt_raw = dna_hurt_extra = dna_hits = 0;   /* (the test's hurt_*: this change's) */
             axl_dash_cancel(p);
+            dash_state_end(p);
             pose_air = STATE(p) == 6 || STATE(p) == 7;
             pose_y = *(volatile float *)(p + 0x1C);
             pose_x = *(volatile float *)(p + 0x14);
@@ -668,6 +696,7 @@ int dna_before(char *p, int special_new, int busy)
             O32(p, 0x40) = 0;
         }
         axl_dash_cancel(p);
+        dash_state_end(p);
         hold_x(p);
         if (--dna_pose == 0) {
             pose_done(p);
@@ -756,8 +785,8 @@ void dna_after(char *p, int fire, int fire_new, int alt_new)
     if (dna_boss == 3) {                          /* Heatnix: a press shoots, a hold charges (axl_dna_bosses.c) */
         if (heat_charge(fire, fire_new, moves_look() != 0 || dna_giga_look() >= 0, !atk_n) && mode == 1)
             atk_n = 1;
-    } else if (mode == 1 && !atk_n && fire)
-        atk_n = 1;                                /* held: the next attack as soon as the motion ends */
+    } else if (mode == 1 && !atk_n && fire && (dna_boss != 5 || scar_has_ball()))
+        atk_n = 1;                                /* (Scaravich: a kick needs his ball, axl_scar.c) */                                /* held: the next attack as soon as the motion ends */
     atk_cur = -1;
     if (atk_n) {
         for (len = 0, i = 0; i < q->n; i++)
@@ -1034,6 +1063,11 @@ void dna_look(char *p, int fire)
         for (t = atk_cur, i = 0; i < q->n - 1 && t >= q->dur[i]; i++)
             t -= q->dur[i];
         pose = q->pose[i];
+        look_s = 2;
+    } else if (scar_waiting() && L->atk.n) {   /* Scaravich with no ball: his kick's last picture (18) held until
+        * the next one is caught (user request 2026-11-15: "18번 시트 상태에서 공을 받았으면해. 공이 없는 상태는 18번 자세로") */
+        mv_seq = 0;
+        pose = L->atk.pose[L->atk.n - 1];
         look_s = 2;
     } else {
         if (!L->fire.n)

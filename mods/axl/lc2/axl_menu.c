@@ -51,6 +51,38 @@ static void pause_lines(int on)
     if (!on)
         line_paused = 0;
 }
+
+/* The world stands still a while (Scaravich's ball growing, his giga's cut-scene: axl_scar.c, user request 2026-11-14):
+ * the play lines paused as under the ring, fn(t) each frame before the units move (the drawing goes on: fn places the
+ * pictures itself). Not while the ring is open. */
+static int menu_state_now(void);
+static void (*freeze_fn)(int t);
+static int freeze_left, freeze_t;
+
+void world_freeze(int frames, void (*fn)(int t))
+{
+    freeze_left = frames;
+    freeze_t = 0;
+    freeze_fn = fn;
+}
+
+static int freeze_tick(void)
+{
+    if (freeze_left <= 0)
+        return 0;
+    if (menu_state_now()) {
+        freeze_left = 0;
+        pause_lines(0);
+        return 0;
+    }
+    pause_lines(1);
+    if (freeze_fn)
+        freeze_fn(freeze_t);
+    freeze_t++;
+    if (--freeze_left == 0)
+        pause_lines(0);
+    return 1;
+}
 #define UNIT_MOVE 0x01E8DB00u
 #define B_LR 0x600            /* X's weapon change buttons (P+0xC0 / C4: 0x400 L, 0x200 R - on the pad, user report 2026-10-29) */
 #define B_L 0x400             /* the ring's button (R: the DNA button, axl_x.c) */
@@ -69,6 +101,7 @@ typedef void(__fastcall *clut_upload_t)(void *ecx, void *edx, int slot, const vo
 #define CLUT_OWNER (*(void **)0x041D8C44)
 
 static int menu_state;        /* 0 closed, 1 opening (badges being set up), 2 open (paused) */
+static int menu_state_now(void) { return menu_state; }
 static int opening, sel, chosen;
 static float ring_rot;        /* degrees still to turn (eases to 0) */
 static float ring_grow;       /* 0 .. 1: the ring spreads out from Axl when it opens */
@@ -389,7 +422,8 @@ static void __fastcall move_hook(void *self)
     if (test_on && menu_state == 1 && opening == OPEN_FRAMES)
         log_lines((char *)self);
     dna_unlook();      /* (the last frame's look off before any unit moves: only the draw sees it) */
-    menu_tick();
+    if (!freeze_tick())
+        menu_tick();
     if (!menu_state)
         dna_watch();
     {
@@ -408,6 +442,7 @@ static void __fastcall move_hook(void *self)
     items_late();      /* (axl_items.c: the 1UP's own palette slot) */
     axl_look_late();   /* (axl_x.c: this frame's look, every unit moved) */
     dna_magma_late();  /* (axl_dna_bosses.c: Heatnix's Magma Stream flames placed) */
+    scar_late();       /* (axl_scar.c: Scaravich's giga cut-scene, its last frames) */
     hud_late(menu_state != 0);   /* (axl_hud.c: the skill HUD placed and shown, or hidden) */
 }
 

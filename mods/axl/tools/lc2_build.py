@@ -250,7 +250,7 @@ def convert(arc, axl, t2, t3, t9, pat_name):
 # checked 2026-10-26); kao.arc holds the same entries and gets the same faces.
 # pc: the eye / mouth pieces where LC2 draws them (k_pl00: face.PC_PIECES); k_pl02's pieces stay at the PS1 places
 # (measured 2026-10-27 with AXL_FACE_TEST=p: the mouth piece at portrait (16, 48); the PC ones broke his eyes / mouth)
-KAO_FACES = ((0, 0, 'map5.json', True), (2, 2, 'map4.json', False))
+KAO_FACES = ((0, 0, 'map5.json', True, False), (2, 2, 'map4.json', False, True))   # (+ warp: face.WARP_AT, k_pl02)
 
 
 # Frames the PS1 build left empty for its RAM (build_axl.BLANK_A) that Axl's anims use: 169 = the last entry sphere
@@ -447,9 +447,9 @@ def put_extra_frames(arc, pat_name, extra, tex_sec=0, pat_sec=0):
 def put_faces(arc):
     import face
     test = os.environ.get('AXL_FACE_TEST')   # u / v: every texel shows its own u / v (layout measurement)
-    for n, i, layout, pc in KAO_FACES:
+    for n, i, layout, pc, warp in KAO_FACES:
         pal, tex = (face.coded(test, n // 2) if test in ('u', 'v') else face.piece_coded(n // 2) if test == 'p' else
-                    face.build(i, layout, pc=pc))
+                    face.build(i, layout, pc=pc, warp=warp))
         t = bytearray(arc.get(F.KAO_TEX % n, F.H_TEX))
         t[20:20 + len(tex)] = tex
         arc.put(F.KAO_TEX % n, F.H_TEX, bytes(t))
@@ -533,6 +533,17 @@ HEAT_VOICES = (
     (9, ('st03_b_PG02_ID03',), 1, 'em34'),    # the shot: "Ha!" (X's request 9 / 12: never played for Axl in the test
     (12, ('st03_b_PG02_ID05',), 1, 'em34'),   # logs; the game's own go to the shot, axl_hook.c se_hook) / the special: "Teya!"
 )
+# Scaravich's voices (user picks 2026-11-15; none on the change, the turn, the roll or the growth): the kick bv040 and
+# the orb bv039 (em32 st05_b), the giga "Chibaku Tensei" (sound/scar_chibaku.wav: an AI voice in Isoc's, user's pick;
+# without it his bv041). pl00 36 / 37: X's PG04 waves, never played for Axl - heard in the game (e2e zz_se_probe,
+# 2026-11-15: 36 right; 37 a semitone low, its bank record's pitch -100 cents, so made a semitone higher); 11: X's
+# charged shot sound, the game's own dropped while Axl plays (axl_hook.c se_hook). New waves on the bank's empty
+# records 37-44 (pl00 request 38 on) were silent (the probe, a new wave entry placed before the bank).
+SCAR_VOICES = (
+    (36, ('bv040',), 1, 'em32'),                                     # the kick
+    (37, ('bv039',), 2 ** (1 / 12), 'em32'),                         # the orb
+    (11, (('scar_chibaku.wav', 'bv041'),), 1, 'em32'),               # the giga's cut-scene
+)
 CHANGE_SOUND = (27, ('concat', ['41_a_copy_shot', '33_a_hensin']))
 # the copy shot's charge (user request 2026-10-27: X's charge sound): X's charge loop (its request 7, 1.35 s, the tail
 # looped; X's code stops request 7 while X is not charging) copied to a free special-weapon slot, request 29
@@ -567,7 +578,7 @@ def request_wave(arc, rid):
 def sound_entries(arc):
     """every wave entry put_sounds writes"""
     out = {'X6\\sound\\' + t for t in AXL_SOUNDS}
-    out |= {request_wave(arc, r) for r in list(BOSS_SOUNDS) + [r for r, *_ in YAM_VOICES + HEAT_VOICES] + [CHANGE_SOUND[0], CHARGE_SOUND[0], HOVER_SOUND[0],
+    out |= {request_wave(arc, r) for r in list(BOSS_SOUNDS) + [r for r, *_ in YAM_VOICES + HEAT_VOICES + SCAR_VOICES] + [CHANGE_SOUND[0], CHARGE_SOUND[0], HOVER_SOUND[0],
                                                            READY_SOUND[0], IKUZO_SOUND[0],
                                                            SIREN_SOUND[0]]}
     return out
@@ -688,10 +699,10 @@ def put_sounds(arc):
         assert len(src) == 1, (em, wav, src)
         arc.put(request_wave(arc, rid), H_WAV, boss[em].get(src[0], H_WAV))
         done += 1
-    for em in ('em31', 'em34'):
+    for em in ('em31', 'em34', 'em32'):
         if em not in boss:
             boss[em] = F.Arc(os.path.join(F.ROMPC, em + '.arc'))
-    for rid, parts, speed, *bank in [v for v in YAM_VOICES] + [v for v in HEAT_VOICES]:
+    for rid, parts, speed, *bank in [v for v in YAM_VOICES] + [v for v in HEAT_VOICES] + [v for v in SCAR_VOICES]:
         em = bank[0] if bank else 'em31'
         pcm = []
         for w in parts:
@@ -873,7 +884,7 @@ def build_kao(out):
     path = os.path.join(out, F.KAO)
     open(path, 'wb').write(arc.build())
     print('wrote %s (%d bytes): portraits k_pl%s' % (path, os.path.getsize(path),
-                                                   ', '.join('%02d' % n for n, _, _, _ in KAO_FACES)))
+                                                   ', '.join('%02d' % n for n, *_ in KAO_FACES)))
 
 
 def main(axl_dat=F.DAT['axl'], out=F.BUILT):
@@ -902,6 +913,7 @@ def main(axl_dat=F.DAT['axl'], out=F.BUILT):
     import boss_look
     hud = lc2_dna.hud_pictures(boss_look.fx_frames(open(F.DAT['us'], 'rb').read()), bosses)
     extra = extra_frames()
+    scar_pics = lc2_dna.scar_pictures()
     victory = victory_frames()
     victory.update(ladder_frames())
     for fn, (_, pat_name) in F.PL02.items():
@@ -915,6 +927,7 @@ def main(axl_dat=F.DAT['axl'], out=F.BUILT):
         fx_slot = lc2_dna.fx_looks(arc, pat_name, fx)       # and their projectiles (texture 27, PAT section 40)
         hud_slot = lc2_dna.hud_looks(arc, pat_name, hud)    # the skill HUD (texture 28, PAT sections 41-48)
         flash_slot = lc2_dna.flash_looks(arc, pat_name)    # the muzzle flash turned (texture 29, PAT section 49)
+        scar_slot = lc2_dna.scar_looks(arc, pat_name, scar_pics)   # Scaravich's kit (texture 30, PAT section 50)
         if os.environ.get('AXL_LC2_SPIKE'):   # feasibility: one more texture (copy of 000) and PAT section 32 (of 0)
             tex0, cof0 = arc.get(F.TEX_NAME % 0, F.H_TEX), arc.get(F.TEX_NAME % 0, F.H_COF)
             px = np.frombuffer(tex0[20:], np.uint8).copy()
@@ -933,7 +946,7 @@ def main(axl_dat=F.DAT['axl'], out=F.BUILT):
         print('wrote %s (%d bytes); com00 shot tiles from Axl: %d (%s-%s); DNA looks %s; X8 sounds %d' % (
             path, os.path.getsize(path), len(tiles), min(tiles), max(tiles), slots[0], n_sounds))
     _, menu_pals = lc2_dna.menu_icons(F.Arc(F.orig_path('pl02_eng.arc')), bosses)
-    lc2_dna.header(bosses, slots, fx_slot, menu_pals, flash_slot)
+    lc2_dna.header(bosses, slots, fx_slot, menu_pals, flash_slot, scar_slot)
     lc2_dna.hud_header(hud_slot, hud)
     build_kao(out)
     build_stsel(out)

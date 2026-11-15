@@ -1,0 +1,54 @@
+# Axl's air dash as the armoured X's (user decision 2026-11-16, axl_x.c AIR_DASH): out at 6.5 px/f slowed to 4.125, 18
+# frames (about 90 px by the numbers); with Hyper Dash (parts bit 0x10, st + 0xB0) 8.125 slowed to 5.156, 10 frames
+# (about 75 px). White Axl (the Ultimate's armour byte st + 0x9A = 4): one dash a press, not X's own air dash with ours
+# (user report 2026-11-16: two dashes). None in a dash jump (user report 2026-11-16, as the armoured X). Nothing held but the dash: dx = the dash alone.
+seq
+wait free == 1 9000
+god on
+ghost on
+goto 360 1080 4
+idle 40
+log adash_plain
+press 6 Z
+mark
+press 2 A
+idle 30
+show dx dy state
+expect dx >= 80 adash_plain_far
+expect dx <= 100 adash_plain_not_too_far
+idle 60
+log adash_hyper
+set B0 10
+idle 4
+press 6 Z
+mark
+press 2 A
+idle 30
+show dx dy state
+expect dx >= 65 adash_hyper_far
+expect dx <= 85 adash_hyper_short
+idle 60
+log adash_white
+set B0 0
+set 9A 4
+idle 30
+press 6 Z
+mark
+press 2 A
+idle 30
+show dx dy state
+expect dx <= 110 adash_white_one_dash
+idle 60
+set 9A 0
+idle 30
+log adash_after_dash_jump
+press 4 A RIGHT
+press 6 A Z RIGHT
+press 4 RIGHT
+mark
+press 2 A
+idle 3
+show adash
+expect adash == 0 adash_none_in_dash_jump
+idle 60
+end

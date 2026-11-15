@@ -1345,6 +1345,124 @@ def flash_looks(arc, pat_name):
     return ti, len(secs) - 1
 
 
+# Ground Scaravich's kit (user design 2026-11-14, axl_scar.c): the rock ball he pushes in 4 sizes, its core (the giga's
+# shot), the purple orb his fist fires (the special: BIN 37 anim 2, pictures 28-31), rock chunks gathering round the
+# giga's target and a dark band for its cut-scene bars. Their own texture (com00's list) and parts section, frames
+# in this fixed order (axl_data.h SC_*), each picture centred on its origin, his 4 palettes as the boss's projectiles:
+#   SC_BALL + 5 * (size - 1) + i: the ball, the original's own pictures per size (parts table 1 on tile base
+#     SCAR_BALL_BASE - not the boss's 0x140, which showed only size 4 whole: user 2026-11-14 "공 크기별로 시트 있지않아?"):
+#     SCAR_BALL_PICS = 5 turning pictures each of size 1-4 (46 / 78 / 110 / 150 px; 10-14 are a cracked gold one)
+#   SC_CORE: its core (the centre of size 4's first picture, SCAR_CORE_R px round)
+#   SC_ORB + i: the orb, pictures SCAR_ORB
+#   SC_ROCK + i: SCAR_ROCKS chunks of the ball's rim (picture 21, SCAR_ROCK_R px round, i * 45 degrees)
+#   SC_BAR: a SCAR_BAR_W x SCAR_BAR_H band of his darkest colour (layer 0 colour 15)
+SCAR_TEX = 18 + 12      # pl02_030
+SCAR_BALL_BASE = 0x240
+SCAR_BALL_PICS = ((0, 1, 2, 3, 4), (5, 6, 7, 8, 9), (15, 16, 17, 18, 19), (20, 21, 22, 23, 24))
+SCAR_CORE_R = 15
+SCAR_ORB = (29, 31, 30, 31)
+SCAR_ROCKS, SCAR_ROCK_R, SCAR_ROCK_AT = 8, 14, 62
+SCAR_BAR_W, SCAR_BAR_H = 160, 32
+SCAR_FRAMES = dict(SC_BALL=0, SC_CORE=20, SC_ORB=21, SC_ROCK=25, SC_BAR=33, SC_FRAMES=34)
+
+
+def scar_pictures():
+    """the kit's pictures in SCAR_FRAMES order: index images (16 * palette layer + colour), 2C square, centred"""
+    import boss_look as L
+    dat = open(F.DAT['us'], 'rb').read()
+    cfg = L.BOSSES[5]
+    b = L.Boss(dat, cfg)
+    C = L.C
+
+    def centred(img, r=None, at=None):
+        ys, xs = np.nonzero(img)
+        cy, cx = at if at else ((ys.min() + ys.max() + 1) // 2, (xs.min() + xs.max() + 1) // 2)
+        out = np.roll(np.roll(img, C - cy, 0), C - cx, 1)
+        if r:
+            yy, xx = np.mgrid[0:2 * C, 0:2 * C]
+            out = np.where((yy - C) ** 2 + (xx - C) ** 2 <= r * r, out, 0)
+        return out
+
+    b.pt = L.table(b, dat, cfg, 1)
+    def body(img):   # the ball's own pixels: the 8-connected blob at its centre (stray parts of other pictures dropped)
+        m = img > 0
+        keep = np.zeros_like(m)
+        ys, xs = np.nonzero(m)
+        i = int(np.argmin((ys - C) ** 2 + (xs - C) ** 2))
+        todo = [(int(ys[i]), int(xs[i]))]
+        keep[todo[0]] = True
+        while todo:
+            y, x = todo.pop()
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    v, u = y + dy, x + dx
+                    if 0 <= v < m.shape[0] and 0 <= u < m.shape[1] and m[v, u] and not keep[v, u]:
+                        keep[v, u] = True
+                        todo.append((v, u))
+        return np.where(keep, img, 0)
+
+    b.base = SCAR_BALL_BASE
+    out = []
+    for pics in SCAR_BALL_PICS:
+        out += [centred(body(centred(b.compose(f)))) for f in pics]
+    b.base = cfg['base']
+    balls = [out[15]]   # (size 4's first picture: the core and the rocks)
+    out.append(centred(balls[0], SCAR_CORE_R, (C, C)))
+    b.pt = L.table(b, dat, cfg, 0)
+    out += [centred(b.compose(f)) for f in SCAR_ORB]
+    for i in range(SCAR_ROCKS):
+        a = np.radians(45 * i)
+        cy, cx = int(round(C - SCAR_ROCK_AT * np.sin(a))), int(round(C + SCAR_ROCK_AT * np.cos(a)))
+        out.append(centred(balls[0], SCAR_ROCK_R, (cy, cx)))
+    bar = np.zeros((2 * C, 2 * C), np.int16)
+    bar[C - SCAR_BAR_H // 2:C + SCAR_BAR_H // 2, C - SCAR_BAR_W // 2:C + SCAR_BAR_W // 2] = 15
+    out.append(bar)
+    assert len(out) == SCAR_FRAMES['SC_FRAMES'], len(out)
+    return out
+
+
+def scar_looks(arc, pat_name, pics=None):
+    """the kit's texture (com00's list, the object's) and parts section: returns (texture index, section)"""
+    import boss_look as L
+    pics = scar_pictures() if pics is None else pics
+    tiles, frames, tile_of = [], [], {}
+    for img in pics:
+        ys, xs = np.nonzero(img)
+        fr = []
+        for layer in sorted({int(v) for v in np.unique(img[img > 0] // 16)}):   # (a plain 16 px grid per layer)
+            lay = np.where((img > 0) & (img // 16 == layer), img % 16, 0).astype(np.uint8)
+            for ty in range(ys.min(), ys.max() + 1, 16):
+                for tx in range(xs.min(), xs.max() + 1, 16):
+                    t = np.zeros((16, 16), np.uint8)
+                    src = lay[ty:ty + 16, tx:tx + 16]
+                    t[:src.shape[0], :src.shape[1]] = src
+                    if t.any():
+                        key = t.tobytes()
+                        if key not in tile_of:
+                            tile_of[key] = len(tiles)
+                            tiles.append(t)
+                        i = tile_of[key]
+                        assert -128 <= tx - L.C <= 127 and -128 <= ty - L.C <= 127, (tx, ty)
+                        fr.append((i >> 8 | layer << 2, i & 0xff, tx - L.C, ty - L.C))
+        frames.append(fr)
+    assert len(tiles) <= 1024, len(tiles)
+    h = 16
+    while h < 16 * ((len(tiles) + 15) // 16):
+        h *= 2
+    assert h <= 1024, h      # (a 2048 px texture crashed the game when drawn, 2026-10-26)
+    tex = np.full((h, 256), F.TEX_PAD, np.uint8)
+    for i, t in enumerate(tiles):
+        tex[16 * (i // 16):16 * (i // 16) + 16, 16 * (i % 16):16 * (i % 16) + 16] = t
+    head = struct.pack('<4sIIII', b'TEX\0', 0x200080a1, 1 | 256 << 6 | h << 19, 0x00011201, 0x14)
+    secs = F.pat_sections(arc.get(pat_name, F.H_PAT))
+    secs.append([[struct.pack('<BBbb', *q) for q in fr] for fr in frames])
+    arc.put(pat_name, F.H_PAT, F.pat(secs))
+    ti = F.add_texture(arc, FX_CTEX, F.TEX_NAME % SCAR_TEX, head + tex.tobytes(), arc.get(F.TEX_NAME % 0, F.H_COF),
+                       len(frames), [0] * len(frames))
+    scar_looks.size = (len(tiles), h)
+    return ti, len(secs) - 1
+
+
 FEET = 22   # X's feet below its origin (feet_line)
 
 
@@ -1378,7 +1496,7 @@ def box_of(k):
     return dx, FEET - h, w, h
 
 
-def header(bosses, slots, fx_slot, menu_pals, flash_slot):
+def header(bosses, slots, fx_slot, menu_pals, flash_slot, scar_slot):
     L = ['/* generated by mods/axl/tools/lc2_dna.py: the DNA Change looks (pl02*.arc); do not edit */',
          '/* (dna_seq, dna_look_t: lc2/axl_data.h) */',
          '#define DNA_SEQ_MAX %d' % SEQ_MAX,
@@ -1419,7 +1537,10 @@ def header(bosses, slots, fx_slot, menu_pals, flash_slot):
           "/* Axl's muzzle flash turned in FLASH_DIRS directions (flash_looks): frame FLASH_NF * d + i = X's flash frame i */",
           '#define FLASH_TEX_INDEX %d' % flash_slot[0], '#define FLASH_PAT %d' % flash_slot[1],
           '#define FLASH_DIRS %d' % FLASH_DIRS, '#define FLASH_NF %d' % len(FLASH_SRC),
-          "/* the DNA menu badges (frame ICON_BASE + i: 0 Axl, k boss k); badge i's palettes at slots MENU_PAL_SLOT +",
+          "/* Scaravich's kit (scar_looks): its texture, parts section and frames */",
+          '#define SCAR_TEX_INDEX %d' % scar_slot[0], '#define SCAR_PAT %d' % scar_slot[1]]
+    L += ['#define %s %d' % kv for kv in SCAR_FRAMES.items()]
+    L += [          "/* the DNA menu badges (frame ICON_BASE + i: 0 Axl, k boss k); badge i's palettes at slots MENU_PAL_SLOT +",
           " * MENU_PALS * i ..: MENU_LEVELS by depth (far dark .. near bright), then selected */",
           '#define ICON_BASE %d' % ICON_BASE, '#define MENU_PAL_SLOT %d' % MENU_PAL_SLOT,
           "/* Giga Crush pictures (lc2_dna.giga_pictures): GIGA_BASE + a = the gun at a * 45 degrees, then the burst */",

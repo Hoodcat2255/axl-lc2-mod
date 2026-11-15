@@ -33,6 +33,7 @@ struct proj {
 proj *proj_of(char *w);
 char *proj_spawn(int id, float x, float y, int vx, int vy, int right, int life, proj_fn fn, int flags);
 void proj_kill(char *w);
+int proj_near(float x, float y, float r, int *boosted);   /* ours within r px; *boosted: a Weapon Plus id among them */
 void proj_kill_dna(void);                       /* every boss-attack projectile (the change ended) */
 void proj_spark(char *w);                        /* the buster's wall hit effect at w */
 void proj_box(char *w, const signed char *box);  /* attack and terrain box {dx, dy, w, h} */

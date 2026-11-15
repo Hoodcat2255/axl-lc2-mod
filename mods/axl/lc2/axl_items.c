@@ -215,6 +215,41 @@ static void test_nzero(void)
 }
 
 /* after the unit pass, before the draw */
+/* Changed into a boss, items are taken by his whole body (user report 2026-11-14: "아이템을 먹을 때, 히트박스 기준이
+ * 아니야?" - the game takes them at Axl's own size, near his origin, while the boss's hurt box is far larger): an item
+ * inside the boss's hurt box (dna_box, either way he faces, ITEM_MARGIN px more) is moved onto Axl's origin, where
+ * the game's own pick-up takes it on its next update */
+#define ITEM_MARGIN 6
+int items_pulled;   /* test */
+
+static void boss_pick(char *o)
+{
+    char *p = axl_p;
+    float x, y, dx, dy;
+    int hx, top, bot;
+    const signed char *b;
+
+    if (!p || !dna_boss || dna_pose || dna_boss > 8 || O8(p, 0x0C) != 1)
+        return;
+    b = dna_box[dna_boss];
+    hx = (b[0] < 0 ? -b[0] : b[0]) > b[0] + b[2] ? (b[0] < 0 ? -b[0] : b[0]) : b[0] + b[2];
+    top = b[1];
+    bot = b[1] + b[3];
+    x = *(volatile float *)(p + 0x14);
+    y = *(volatile float *)(p + 0x1C);
+    dx = *(volatile float *)(o + 0x14) - x;
+    dy = *(volatile float *)(o + 0x1C) - y;
+    if (dx < -hx - ITEM_MARGIN || dx > hx + ITEM_MARGIN || dy < top - ITEM_MARGIN || dy > bot + ITEM_MARGIN)
+        return;
+    if (dx > -12 && dx < 12 && dy > -20 && dy < 20)
+        return;                                   /* (at Axl's own size already: the game's) */
+    *(volatile float *)(o + 0x14) = x;
+    *(volatile float *)(o + 0x1C) = y;
+    items_pulled++;
+    if (test_on)
+        test_log("item %p kind %02x in boss %d's box (%.0f %.0f from Axl): onto Axl", o, O8(o, 10), dna_boss, dx, dy);
+}
+
 void items_late(void)
 {
     int k, i, n = 0;
@@ -230,6 +265,8 @@ void items_late(void)
                 continue;
             if (test_on && is_item(o))
                 test_items(k, o);
+            if (is_item(o))
+                boss_pick(o);
             if (items_n_kinds && O8(o, 9) == ITEM_TYPE && is_item(o) && !forced(o)) {
                 static int next;
                 int kind = items_kinds[next < items_n_kinds ? next : items_n_kinds - 1];

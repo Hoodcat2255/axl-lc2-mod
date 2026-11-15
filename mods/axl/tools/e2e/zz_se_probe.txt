@@ -1,0 +1,23 @@
+# Sound slot check (2026-11-15; lc2_build SCAR_VOICES), each request on no object 2 s apart, the game's sound recorded
+# beside it (ffmpeg -f pulse from the monitor) and each wave looked for there: pl00 25 (control: Scaravich's kick),
+# 36 (his kick voice bv040), 37 (the orb voice bv039, made a semitone higher for its record's -100 cents), 11 (the
+# giga's "Chibaku Tensei"). The first probe (empty record 36 with a new wave = request 38) was silent; 36 / 37 were
+# heard there.
+seq
+wait free == 1 9000
+god on
+idle 60
+log probe_ctrl_25
+se 1 25
+idle 120
+log probe_36
+se 1 36
+idle 120
+log probe_37
+se 1 37
+idle 120
+log probe_11
+se 1 11
+idle 240
+log probe_end
+end

@@ -15,8 +15,8 @@
 
 #define AXL_DATA_FILE "axl_data.bin"
 #define AXL_DATA_MAGIC 0x444C5841u   /* "AXLD" */
-#define AXL_DATA_VERSION 10          /* + 1 at every layout change */
-#define AXL_DATA_SIZE 45848          /* sizeof(axl_data_t): the packer and the DLL agree on the layout */
+#define AXL_DATA_VERSION 11          /* + 1 at every layout change */
+#define AXL_DATA_SIZE 45856          /* sizeof(axl_data_t): the packer and the DLL agree on the layout */
 
 /* ---- the mod's own constants (the generated headers repeat them: a mismatch stops the packer) ---- */
 #define DNA_SEQ_MAX 96
@@ -27,6 +27,14 @@
 #define FLASH_DIRS 8
 #define FLASH_NF 4
 #define GIGA_SPIN 8
+/* Scaravich's kit pictures (lc2_dna.scar_looks): frames of its own parts section, in this order */
+#define SC_BALL 0      /* + SC_TURN * (size - 1) + i: the rock ball, sizes 1-4, SC_TURN turning pictures */
+#define SC_TURN 5
+#define SC_CORE 20     /* the ball's core (the giga's shot) */
+#define SC_ORB 21      /* + i (4): the fist's purple orb (the special) */
+#define SC_ROCK 25     /* + i (8): rock chunks (the giga's gathering) */
+#define SC_BAR 33      /* a dark band 160 x 32 (the giga's cut-scene bars) */
+#define SC_FRAMES 34
 #define MENU_LEVELS 4
 #define MENU_PALS 5
 #define HUD_STEPS 16
@@ -92,6 +100,8 @@ typedef struct {
     unsigned short hud_pals[N_BOSSES][2 * HUD_LEVELS][16];
     /* axl_dna_looks.h: the turned muzzle flash (lc2_dna.flash_looks) */
     int flash_tex_index, flash_pat;
+    /* axl_dna_looks.h: Scaravich's kit (lc2_dna.scar_looks) */
+    int scar_tex_index, scar_pat;
     /* axl_pal.h: the 1UP's own palette (lc2_build.oneup_own_pal, axl_items.c) */
     unsigned short oneup_pal[16];
 } axl_data_t;
@@ -197,6 +207,8 @@ int axl_data_load(void);   /* 1 = axl_data.bin read and checked */
 #define hud_pals (axl_d.hud_pals)
 #define FLASH_TEX_INDEX (axl_d.flash_tex_index)
 #define FLASH_PAT (axl_d.flash_pat)
+#define SCAR_TEX_INDEX (axl_d.scar_tex_index)
+#define SCAR_PAT (axl_d.scar_pat)
 #define oneup_pal (axl_d.oneup_pal)
 #endif
 

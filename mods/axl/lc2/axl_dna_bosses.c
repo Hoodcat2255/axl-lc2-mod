@@ -309,10 +309,30 @@ static void y_option(char *w, proj *q)
  * e+0x65: the probe of 2026-11-11 found none) is the charge's */
 #define Y_CHARGE_LESS 1
 #define Y_CHARGE_NEAR 40.0f
+/* Weapon Plus on every changed attack (user decision 2026-11-16: "웨폰플러스 장착시 보스 모든공격은 데미지 +1"; the
+ * game's own +1 takes the weapon ids 1-8 / 0x0A-0x11 only - not Yammark's gatling (0), Sheldon's counter shots, the
+ * gigas' kill id 0x16): a loss while changed with one of ours on the enemy (WP_NEAR px), none of them such an id */
+#define WP_NEAR 64.0f
+extern int axl_part_weapon;   /* axl_x.c */
+
 int dna_hit_loss(char *e, int loss)
 {
     int i;
     proj *q;
+
+    if (dna_boss && axl_part_weapon && loss > 0) {
+        int boosted, n = proj_near(PX(e), PY(e), WP_NEAR, &boosted);
+        /* (the game's own +1 only when its parts word, P+0x258, has the bit: a part put on in the stage is not
+         * there - e2e zz_weapon_plus 2026-11-16, the fireball stayed 6) */
+        int game_has = axl_p && (*(volatile unsigned *)(axl_p + 0x258) & 0x200000u);
+        if (n && !(boosted && game_has)) {
+            if (test_on)
+                test_log("weapon plus: %d -> %d", loss, loss + 1);
+            loss++;
+        }
+    }
+    if (dna_boss == 5)
+        return scar_hit_loss(e, loss);            /* (Scaravich's ball: by its size, axl_scar.c) */
     if (dna_boss != 1 || yam_form != 1 || loss <= 1)
         return loss;
     for (i = 0; i < Y_OPTS; i++)
@@ -990,49 +1010,13 @@ void dna_shark(char *p, int t, int fire, int fire_new)
     CD(30);
 }
 
-/* ---- 5 Ground Scaravich: ball kicked onto the target in 40 frames, then rolls 3 px/f on the floor ----------- */
-static const signed char box_ball[4] = {-23, -23, 46, 46};
-
-static void s_ball(char *w, proj *q)
-{
-    unsigned char c = TERR(w);
-
-    if (c & 3) {                                  /* wall: breaks */
-        proj_spark(w);
-        proj_kill(w);
-        return;
-    }
-    if (!q->b) {
-        if (c & 8) {                              /* landed: roll */
-            axl_sound(SND_SCAR_ROLL);
-            q->b = 1;
-            VX(w) = FACE(w) ? FXP(3) : FXP(-3);
-            VY(w) = 0;
-        } else
-            VY(w) -= 0x1400;
-        return;
-    }
-    VY(w) = (c & 8) ? 0 : VY(w) - 0x1400;        /* keep to the floor over slopes and ledges */
-}
-
+/* ---- 5 Ground Scaravich: the kick's frame sends his held ball rolling (his kit: axl_scar.c) ---------------- */
 void dna_scaravich(char *p, int t, int fire, int fire_new)
 {
-    float tx, ty;
-    char *w;
-
-    if (cooldown)
-        cooldown--;
-    if (!(fire_new || (fire && !cooldown)) || cooldown)
-        return;
-    aim_point(p, 200, 128, &tx, &ty);
-    w = proj_spawn(5, gun_x(p), PY(p) - 24, (int)((tx - gun_x(p)) * 65536) / 40, FXP(2.5), FACE(p), 400, s_ball,
-                   P_PIERCE | P_KEEP);
-    if (w) {
-        axl_sound(SND_SCAR_KICK);
-        proj_boss_look(w, FX_BALL);
-        proj_box(w, box_ball);
-    }
-    CD(45);
+    (void)t;
+    (void)fire_new;
+    if (fire)
+        scar_kick(p);
 }
 
 /* ---- 6 Rainy Turtloid: rain shots rise 8 px/f, wait 50 frames, fall at 45 degrees 2 px/f -------------- */
@@ -1786,7 +1770,10 @@ int dna_fire_immune(char *att)
      * box, kills at once); its small 12 px kind (sub 04, 2 damage) is not that fire and still hurts */
     /* the gate stage's (16) rising fire too (user request 2026-11-14; play log: type 0x1d sub 0a, a 240 x 240 box,
      * kills at once) */
-    if (dna_boss == 3 && g && (unsigned char)g[0x70 + 0x48] == 3 &&
+    /* (his stage's Another Route, the blue portal's way, is stage 20 area 0 (st03x; 20:1 = Shark's, docs/stage_numbers.md): its red floor flames hurt him there, play log
+     * 2026-11-16 - 'hurt BY type 24 sub 11 16x56' changed to him, 'stage 20' in the same run) */
+    if (dna_boss == 3 && g && ((unsigned char)g[0x70 + 0x48] == 3 ||
+                               ((unsigned char)g[0x70 + 0x48] == 20 && (unsigned char)g[0x70 + 0x49] == 0)) &&
         (t == 0x24 || (t == 0x1d && box && box[6] >= MAGMA_BOX_MIN)))
         im = 1;
     if (dna_boss == 3 && g && (unsigned char)g[0x70 + 0x48] == 16 && t == 0x1d && box && box[6] >= MAGMA_BOX_MIN)
@@ -1794,8 +1781,9 @@ int dna_fire_immune(char *att)
     if (test_on) {
         static unsigned last;
         if (axl_frames - last > 20 || im || fire_log_all)
-            test_log("hurt by type %02x sub %02x box %dx%d (boss %d)%s", t, att ? O8(att, 10) : 0, box ? box[6] : 0,
-                     box ? box[7] : 0, dna_boss, im ? ": magma, none" : "");
+            test_log("hurt by type %02x sub %02x box %dx%d (boss %d, stage %d)%s", t, att ? O8(att, 10) : 0,
+                     box ? box[6] : 0, box ? box[7] : 0, dna_boss, g ? (unsigned char)g[0x70 + 0x48] : -1,
+                     im ? ": magma, none" : "");
         last = axl_frames;
     }
     fire_blocked += im;
@@ -2029,97 +2017,12 @@ static void giga_sheldon(char *p)
     giga_k = 0;                                   /* (the shell goes on by itself; he keeps moving) */
 }
 
-/* 5 Scaravich: the size-4 ball (BIN 37: 100 x 100, damage 16) made in front of him, kicked at the kick's frame of his
- * attack motion (23), rolling 3 px/f along the floor through the enemies (each again every 20 frames); a wall (or
- * 6 s) breaks it into 4 balls flung up */
-#define SG_KICK 23
-#define SG_LEN 38
-static const signed char box_big[4] = {-50, -50, 100, 100};
-
-static void sg_break(char *w)
-{
-    int i;
-    char *s;
-    axl_sound(SND_SCAR_ROLL);
-    for (i = 0; i < 4; i++) {
-        s = proj_spawn(GID_SCAR, PX(w) + (i - 1.5f) * 20, PY(w) - 10, (int)((i - 1.5f) * FXP(1.5)), FXP(3 + (i & 1)), i >= 2,
-                       60, w_gravity, P_PIERCE | P_NOSCREEN | P_GIGA);
-        if (s) {
-            proj_of(s)->a = 0x2000;
-            proj_boss_look(s, FX_BALL);
-            proj_box(s, box_ball);
-        }
-    }
-    proj_spark(w);
-    proj_kill(w);
-}
-
-/* its terrain tests are its own (P_WALL): the 100 px box reads wall bits where it stands too (2 on the intro's flat
- * floor, 2026-11-03 e2e), so a wall is a wall bit SG_LIFT px higher that the spot 8 px behind does not have (as
- * axl_moves.c wall_ahead); the floor where it is (sunk in: lifted out, at most 8 px a frame) */
-#define SG_LIFT 12
-
-static void sg_ball(char *w, proj *q)
-{
-    float y = PY(w);
-    int f = GIGA_BALL + (q->t / 5) % GIGA_BALL_N, wall, floor, n;
-
-    if (dead_dna(w, 5))
-        return;
-    if (q->c != f) {                              /* rolling: its 3 pictures (held frames of the HUD section) */
-        q->c = f;
-        proj_pose_look(w, HUD_TEX_INDEX, GIGA_SEC(5), f);
-    }
-    PY(w) = y - SG_LIFT;
-    wall = proj_terrain(w) & 3;
-    PX(w) -= q->a * 8;
-    wall &= ~proj_terrain(w);
-    PX(w) += q->a * 8;
-    PY(w) = y;
-    floor = proj_terrain(w) & 8;
-    for (n = 0; floor && n < 8 && (proj_terrain(w) & 8); n++)
-        PY(w) -= 1;                               /* (out of the floor: its bottom on it) */
-    if (n)
-        PY(w) += 1;
-    if (q->b && (wall || q->t > 360)) {
-        if (test_on)
-            test_log("giga 5 ball breaks at t %d (wall %x) x %.0f", q->t, wall, PX(w));
-        sg_break(w);
-        return;
-    }
-    VX(w) = q->b ? q->a * FXP(3) : 0;
-    VY(w) = floor ? 0 : VY(w) - 0x1400;           /* on the floor, falling off ledges */
-}
-
-static char *sg_the_ball;
-
+/* 5 Scaravich: the ball's core kicked at the nearest enemy, then the crush as a cut-scene (axl_scar.c scar_giga,
+ * user request 2026-11-14) */
 static void giga_scaravich(char *p, int t)
 {
-    proj *q;
-
-    giga_pose = t;                                /* the kick motion as it is */
-    if (t == 0) {
-        sg_the_ball = proj_spawn(GID_SCAR, PX(p) + SX(p) * 58, PY(p) - 26, 0, 0, 0, 0, sg_ball,
-                                 P_PIERCE | P_TOUGH | P_WALL | P_GIGA);
-        if (sg_the_ball) {
-            q = proj_of(sg_the_ball);
-            q->a = SX(p);
-            q->c = -1;
-            proj_box(sg_the_ball, box_big);
-            proj_pose_look(sg_the_ball, HUD_TEX_INDEX, GIGA_SEC(5), GIGA_BALL);
-        }
-    }
-    if (t == SG_KICK && sg_the_ball && (q = proj_of(sg_the_ball)) != 0 && q->fn == sg_ball) {
-        axl_sound(SND_SCAR_KICK);
-        axl_sound(SND_SCAR_ROLL);
-        q->b = 1;
-        if (test_on)
-            test_log("giga 5 kick");
-    }
-    if (t + 1 >= SG_LEN) {
-        sg_the_ball = 0;
+    if (!scar_giga(p, t, &giga_pose))
         giga_k = 0;
-    }
 }
 
 /* 8 Mijinion: the energy gathers (18 frames), then 4 waves of the 8-way shot (BIN 40 subs 7-10: 0-315 degrees, 6 px/f,
@@ -2260,6 +2163,12 @@ int dna_value(const char *name, int *ok)
     char *p = axl_p;
 
     *ok = 1;
+    {
+        int v = scar_value(name, ok);
+        if (*ok)
+            return v;
+        *ok = 1;
+    }
     if (!strcmp(name, "proj_live"))
         return N_PROJ - proj_free();
     if (!strcmp(name, "proj_fails"))

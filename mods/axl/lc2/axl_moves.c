@@ -11,7 +11,8 @@
  *   Heatnix     tap: X-style dash 20 f (yd_*, hd_input);       the 3-step blade \\ / X 5 px/f through walls (the shot's until 2026-11-12)
  *   Shark       junk swim: under the floor, the fin only,     leap 8 px/f above the target, hover, pound 5 px/f
  *               5 px/f left / right while dash is held, invincible (walking: the prone fin, boss_look walk)
- *   Scaravich   charge 5 px/f, body hit                       small balls 3 px/f
+ *   Scaravich   holding his ball: rolls round it to its       his fist's purple orb, aimed (axl_scar.c)
+ *               other side (axl_scar.c); none: charge 5 px/f
  *   Turtloid    shell roll up to 5 px/f, invincible, rain     shell bounce x3, invincible
  *   Sheldon     teleport 80 px forward (8 px steps up to a wall)  shell plates on / off (dna_alt)
  *   Mijinion    drop 9 px/f (in the air), body hit, landing:  3 small clones homing 1.5 px/f
@@ -127,7 +128,6 @@ static int rand_n(int n)
 static const signed char box_small[4] = {-6, -6, 12, 12};
 static const signed char box_spike[4] = {-5, -15, 10, 30};   /* the floor spike once grown (BIN 34: {-5,-15,10,30}) */
 static const signed char box_anchor[4] = {-12, -12, 24, 24};
-static const signed char box_ball[4] = {-12, -12, 24, 24};
 static const signed char box_ray[4] = {-8, -8, 16, 16};
 
 static int on_ground(int st) { return st == 2 || st == 3 || st == 4 || st == 8; }
@@ -835,6 +835,7 @@ void moves_reset(char *p)
     wolf_st = 0;
     wolf_body = 0;
     move_auto = 0;
+    scar_reset();
     skill_reset();   /* (every skill ready at the change's start: user decision 2026-11-03) */
     dna_giga_reset();
 }
@@ -865,6 +866,8 @@ int moves_look(void)
                wolf_st == W_LEAP ? 8 : 9;
     if (move_k & 0x800)                           /* (a move's landing: Mijinion's drop) */
         return 3;
+    if (scar_flipping())                          /* Scaravich rolled up round his ball: the dash's look */
+        return 1;
     if (dna_boss == 3 && yd_left)                 /* Heatnix's plain dash: his wings-level picture (look cdash) */
         return 7;
     if (seq_n && seq_k == 3 && slash_step < 2)   /* Heatnix's wing swings (the 3-step blade's \\ and /) */
@@ -929,6 +932,8 @@ int moves_before(char *p, int dash_new, int dash_held, int alt_new)
     }
     if (k != 2 && wolf_st)
         wolf_end(p);
+    if (k == 5 && scar_before(p, &dash_new))   /* Scaravich rolling round his ball (axl_scar.c) */
+        return 1;
     if (slash_idle < 1000)
         slash_idle++;
     if (k == 1)
@@ -966,7 +971,9 @@ int moves_before(char *p, int dash_new, int dash_held, int alt_new)
         /* the second attack (Wolfang's: wolf_input; Shark's leap and Turtloid's bounce not during a move) */
         seq_k = k;
         seq_t = 0;
-        seq_n = k == 2 ? 4 : k == 8 ? 3 : k == 5 ? 3 : k == 4 ? 0 : 1;
+        seq_n = k == 2 ? 4 : k == 8 ? 3 : k == 4 ? 0 : 1;
+        if (k == 5)
+            seq_t = 10;                           /* Scaravich's orb at his fist's muzzle picture (anim 2: 10) */
         if (k == 3) {   /* the 3-step blade's step, its motion and its moment (user requests 2026-11-12): \\ from his
                          * left wing, / from his right one (the user's drawings: look cshot / leap, the blade at t =
                          * 8), the X with anim 6 (look alt, t = 18) */
@@ -1020,7 +1027,7 @@ int moves_before(char *p, int dash_new, int dash_held, int alt_new)
                         test_log("heat blade step %d", slash_step);
                 } axl_sound(SND_HEAT_SHOT); axl_voice(SND_HEAT_TEYA); break;   /* (BIN 35 sub 0: 5 px/f
                                                    * through walls; "Teya!", user request 2026-11-12) */
-        case 5: shot(5, x, y + 12, SX(p) * FXP(3), 0, FACE(p), 120, 0, 0, FX_BALL, box_ball); seq_t = 10; break;
+        case 5: scar_orb(p); break;   /* his fist's purple orb (axl_scar.c, user request 2026-11-14) */
         case 8: shot(8, PX(p), PY(p) - 30 - 12 * seq_n, SX(p) * FXP(1), FXP(1), FACE(p), 180, clone_fn, P_PIERCE, FX_CLONE,
                      box_ray); seq_t = 6; break;
         }
@@ -1055,6 +1062,8 @@ void moves_after(char *p)
         wolf_after(p);
         return;
     }
+    if (dna_boss == 5)
+        scar_after(p);                            /* (his ball: axl_scar.c) */
     if (yd_left)
         yd_after(p);
     yd_ghosts_frame();

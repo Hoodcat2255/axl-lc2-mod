@@ -1,0 +1,27 @@
+# Probe (2026-11-15): Scaravich's ball in the air (hanging on his fists, axl_scar.c sc_place) - a jump with the
+# size-1 ball, snaps on the way up and at the top; a kick in the air must not hover him (no hover changed).
+all_weapons
+hpwatch 7990
+seq
+wait free == 1 9000
+god on
+energy full
+ghost on
+goto 360 1080 4
+idle 40
+pset 14C 5
+press 4 S
+idle 100
+press 2 RIGHT
+idle 10
+press 30 Z
+log snap_jump
+snap
+idle 20
+press 2 X
+idle 6
+log snap_kick_air
+snap
+idle 60
+show state py
+end
